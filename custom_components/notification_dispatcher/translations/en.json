@@ -1,0 +1,84 @@
+{
+  "title": "Notification Dispatcher",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Set up Notification Dispatcher",
+        "description": "Create the dispatcher. Add people from the integration options afterwards.",
+        "data": {
+          "instance_name": "Name"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "Notification Dispatcher is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Notification Dispatcher options",
+        "menu_options": {
+          "add_person": "Add person",
+          "edit_person": "Edit person",
+          "remove_person": "Remove person"
+        }
+      },
+      "add_person": {
+        "title": "Add person",
+        "description": "Critical notifications are always delivered. Select the additional types this person should receive.",
+        "data": {
+          "name": "Name",
+          "person_entity_id": "Person",
+          "notify_targets": "Notify targets",
+          "enabled_types": "Additional notification types",
+          "only_when_home": "Only when home",
+          "allow_weekdays": "Allow weekdays",
+          "weekday_start": "Weekday start",
+          "weekday_end": "Weekday end",
+          "allow_weekends": "Allow weekends",
+          "weekend_start": "Weekend start",
+          "weekend_end": "Weekend end",
+          "dnd_enabled": "Enable DND",
+          "dnd_start": "DND start",
+          "dnd_end": "DND end"
+        }
+      },
+      "edit_person": {
+        "title": "Select person",
+        "data": {
+          "id": "Person"
+        }
+      },
+      "edit_details": {
+        "title": "Edit person",
+        "description": "Critical notifications are always delivered. Select the additional types this person should receive.",
+        "data": {
+          "name": "Name",
+          "person_entity_id": "Person",
+          "notify_targets": "Notify targets",
+          "enabled_types": "Additional notification types",
+          "only_when_home": "Only when home",
+          "allow_weekdays": "Allow weekdays",
+          "weekday_start": "Weekday start",
+          "weekday_end": "Weekday end",
+          "allow_weekends": "Allow weekends",
+          "weekend_start": "Weekend start",
+          "weekend_end": "Weekend end",
+          "dnd_enabled": "Enable DND",
+          "dnd_start": "DND start",
+          "dnd_end": "DND end"
+        }
+      },
+      "remove_person": {
+        "title": "Remove person",
+        "data": {
+          "id": "Person"
+        }
+      }
+    },
+    "error": {
+      "missing_notify_target": "Add at least one notify target."
+    }
+  }
+}
