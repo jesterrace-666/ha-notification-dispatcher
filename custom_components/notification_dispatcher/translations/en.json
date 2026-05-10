@@ -29,8 +29,10 @@
         "description": "Critical notifications are always delivered. Select the additional types this person should receive.",
         "data": {
           "name": "Name",
+          "target_key": "Target key",
           "person_entity_id": "Person",
           "notify_targets": "Notify targets",
+          "fallback_target_key": "Fallback target key",
           "enabled_types": "Additional notification types",
           "only_when_home": "Only when home",
           "allow_weekdays": "Allow weekdays",
@@ -55,8 +57,10 @@
         "description": "Critical notifications are always delivered. Select the additional types this person should receive.",
         "data": {
           "name": "Name",
+          "target_key": "Target key",
           "person_entity_id": "Person",
           "notify_targets": "Notify targets",
+          "fallback_target_key": "Fallback target key",
           "enabled_types": "Additional notification types",
           "only_when_home": "Only when home",
           "allow_weekdays": "Allow weekdays",
@@ -78,7 +82,9 @@
       }
     },
     "error": {
-      "missing_notify_target": "Add at least one notify target."
+      "missing_notify_target": "Add at least one notify target.",
+      "duplicate_target_key": "This target key is already used by another person.",
+      "reserved_target_key": "The target key all is reserved."
     }
   }
 }
