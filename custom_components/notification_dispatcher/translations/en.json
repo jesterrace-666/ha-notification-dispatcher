@@ -18,12 +18,15 @@
         "menu_options": {
           "add_person": "Add person",
           "edit_person": "Edit person",
-          "remove_person": "Remove person"
+          "remove_person": "Remove person",
+          "add_group": "Add group",
+          "edit_group": "Edit group",
+          "remove_group": "Remove group"
         }
       },
       "add_person": {
         "title": "Add person",
-        "description": "Choose a Home Assistant person and that person's mobile app targets. Enter time windows as 08:00-22:00; empty means no delivery on weekdays/weekends and no quiet hours for DND. Critical notifications are always delivered.",
+        "description": "Choose a Home Assistant person and enter the mobile app targets, for example notify.mobile_app_jmi_iphone. Separate multiple targets with commas. The all/alle target is built in and cannot be deleted.",
         "data": {
           "person_entity_id": "Person",
           "notify_targets": "Mobile app targets",
@@ -42,7 +45,7 @@
       },
       "edit_details": {
         "title": "Edit person",
-        "description": "Choose a Home Assistant person and that person's mobile app targets. Enter time windows as 08:00-22:00; empty means no delivery on weekdays/weekends and no quiet hours for DND. Critical notifications are always delivered.",
+        "description": "Choose a Home Assistant person and enter the mobile app targets, for example notify.mobile_app_jmi_iphone. Separate multiple targets with commas. The all/alle target is built in and cannot be deleted.",
         "data": {
           "person_entity_id": "Person",
           "notify_targets": "Mobile app targets",
@@ -58,12 +61,45 @@
         "data": {
           "id": "Person"
         }
+      },
+      "add_group": {
+        "title": "Add group",
+        "description": "The all/alle target always exists. Use groups for additional reusable recipient sets such as Family or Parents.",
+        "data": {
+          "name": "Group name",
+          "group_members": "People"
+        }
+      },
+      "edit_group": {
+        "title": "Select group",
+        "data": {
+          "group_id": "Group"
+        }
+      },
+      "edit_group_details": {
+        "title": "Edit group",
+        "description": "Change the group's name and people. all/alle remains built in and cannot be removed.",
+        "data": {
+          "name": "Group name",
+          "group_members": "People"
+        }
+      },
+      "remove_group": {
+        "title": "Remove group",
+        "data": {
+          "group_id": "Group"
+        }
       }
     },
     "error": {
       "missing_notify_target": "Add at least one notify target.",
+      "missing_person": "Choose a person.",
       "duplicate_person": "This person is already configured in the dispatcher.",
-      "invalid_time_window": "Enter a time window like 08:00-22:00."
+      "invalid_time_window": "Enter a time window like 08:00-22:00.",
+      "missing_group_name": "Enter a group name.",
+      "missing_group_members": "Choose at least one person for the group.",
+      "duplicate_group": "This group already exists.",
+      "reserved_group_name": "all/alle is built in and cannot be used as a group name."
     }
   }
 }
