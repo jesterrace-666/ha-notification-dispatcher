@@ -1,0 +1,84 @@
+{
+  "title": "Notification Dispatcher",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Notification Dispatcher einrichten",
+        "description": "Erstellt den Dispatcher. Personen fuegst du danach ueber die Optionen der Integration hinzu.",
+        "data": {
+          "instance_name": "Name"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "Notification Dispatcher ist bereits eingerichtet."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Notification Dispatcher Optionen",
+        "menu_options": {
+          "add_person": "Person hinzufuegen",
+          "edit_person": "Person bearbeiten",
+          "remove_person": "Person entfernen"
+        }
+      },
+      "add_person": {
+        "title": "Person hinzufuegen",
+        "description": "Kritische Nachrichten werden immer zugestellt. Waehle hier die zusaetzlichen Typen, die diese Person erhalten soll.",
+        "data": {
+          "name": "Name",
+          "person_entity_id": "Person",
+          "notify_targets": "Notify-Ziele",
+          "enabled_types": "Zusaetzliche Nachrichtentypen",
+          "only_when_home": "Nur wenn zuhause",
+          "allow_weekdays": "Werktage erlauben",
+          "weekday_start": "Start Werktage",
+          "weekday_end": "Ende Werktage",
+          "allow_weekends": "Wochenende erlauben",
+          "weekend_start": "Start Wochenende",
+          "weekend_end": "Ende Wochenende",
+          "dnd_enabled": "DND aktivieren",
+          "dnd_start": "DND Start",
+          "dnd_end": "DND Ende"
+        }
+      },
+      "edit_person": {
+        "title": "Person auswaehlen",
+        "data": {
+          "id": "Person"
+        }
+      },
+      "edit_details": {
+        "title": "Person bearbeiten",
+        "description": "Kritische Nachrichten werden immer zugestellt. Waehle hier die zusaetzlichen Typen, die diese Person erhalten soll.",
+        "data": {
+          "name": "Name",
+          "person_entity_id": "Person",
+          "notify_targets": "Notify-Ziele",
+          "enabled_types": "Zusaetzliche Nachrichtentypen",
+          "only_when_home": "Nur wenn zuhause",
+          "allow_weekdays": "Werktage erlauben",
+          "weekday_start": "Start Werktage",
+          "weekday_end": "Ende Werktage",
+          "allow_weekends": "Wochenende erlauben",
+          "weekend_start": "Start Wochenende",
+          "weekend_end": "Ende Wochenende",
+          "dnd_enabled": "DND aktivieren",
+          "dnd_start": "DND Start",
+          "dnd_end": "DND Ende"
+        }
+      },
+      "remove_person": {
+        "title": "Person entfernen",
+        "data": {
+          "id": "Person"
+        }
+      }
+    },
+    "error": {
+      "missing_notify_target": "Fuege mindestens ein Notify-Ziel hinzu."
+    }
+  }
+}
