@@ -6,6 +6,8 @@ Eine Custom Integration fuer Home Assistant, die Benachrichtigungen zentral an P
 
 - Personenprofile in der Home-Assistant-UI verwalten
 - pro Person eine `person.*` Entitaet und eine oder mehrere `notify.*` Mobile-App-Ziele hinterlegen
+- fest eingebautes Ziel `all`/`alle`, das alle konfigurierten Personen auswaehlt
+- eigene Gruppen aus Personen anlegen, z.B. `familie`
 - Zustellung nach Typ steuern: `critical`, `warning`, `info`, `reminder`
 - Werktage und Wochenende mit kompakten Zeitfenstern wie `08:00-22:00` versehen
 - DND-Zeit pro Person konfigurieren
@@ -18,7 +20,7 @@ Die Action erwartet im Kern:
 1. `title`
 2. `message`
 3. `type`: `critical`, `info`, `warning` oder `reminder`
-4. `target`: leer/`all` fuer alle oder eine bzw. mehrere `person.*` Entitaeten
+4. `target`: leer, `all`/`alle`, eine Person oder eine Dispatcher-Gruppe
 
 ## Installation
 
@@ -41,7 +43,7 @@ Die Action erwartet im Kern:
 4. Suche nach **Notification Dispatcher**.
 5. Oeffne danach die Optionen der Integration und fuege Personen hinzu.
 
-Beim Hinzufuegen einer Person waehlst du direkt die vorhandene `person.*` Entitaet aus Home Assistant aus. Danach hinterlegst du ein oder mehrere Mobile-App-Ziele. Die Integration bietet vorhandene `notify.*` Ziele an; du kannst aber weiterhin eigene Werte wie `notify.mobile_app_jmi_iphone` eintragen.
+Beim Hinzufuegen einer Person waehlst du direkt die vorhandene `person.*` Entitaet aus Home Assistant aus. Danach hinterlegst du ein oder mehrere Mobile-App-Ziele als Text, zum Beispiel `notify.mobile_app_jmi_iphone`. Mehrere Ziele trennst du mit Komma.
 
 Zeitfenster werden kompakt eingetragen:
 
@@ -51,6 +53,8 @@ Zeitfenster werden kompakt eingetragen:
 
 Ein leeres Werktag- oder Wochenende-Feld bedeutet: an diesen Tagen nicht zustellen. Eine leere Ruhezeit bedeutet: keine DND-Sperre.
 
+Das Ziel `all` bzw. `alle` ist immer vorhanden und kann nicht geloescht werden. Zusaetzlich kannst du in den Optionen Gruppen anlegen. Eine Gruppe wird beim Senden ueber ihren Namen angesprochen, zum Beispiel `familie`.
+
 ## Action nutzen
 
 ```yaml
@@ -59,6 +63,7 @@ data:
   title: "Waschmaschine"
   message: "Die Waesche ist fertig."
   type: reminder
+  target: alle
 ```
 
 Nur bestimmte Personen:
@@ -71,6 +76,17 @@ data:
   type: warning
   target:
     - person.johannes
+```
+
+Eine Gruppe:
+
+```yaml
+action: notification_dispatcher.send
+data:
+  title: "Essen"
+  message: "Essen ist fertig."
+  type: info
+  target: familie
 ```
 
 Kritisch:
@@ -106,6 +122,7 @@ data:
   title: "Test"
   message: "Wuerde so zugestellt werden."
   type: info
+  target: all
   dry_run: true
 ```
 
