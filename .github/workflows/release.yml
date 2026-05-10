@@ -1,0 +1,30 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create or update release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v0.1.1
+          name: v0.1.1
+          target_commitish: main
+          make_latest: true
+          body: |
+            Notification Dispatcher v0.1.1
+
+            - Marks the integration as a Home Assistant service instead of a helper.
+            - Removes the HACS minimum Home Assistant version gate.
+            - Keeps the script-style target field for recipients.
