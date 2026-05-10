@@ -7,10 +7,9 @@ Eine Custom Integration fuer Home Assistant, die Benachrichtigungen zentral an P
 - Personenprofile in der Home-Assistant-UI verwalten
 - pro Person eine `person.*` Entitaet und eine oder mehrere `notify.*` Mobile-App-Ziele hinterlegen
 - Zustellung nach Typ steuern: `critical`, `warning`, `info`, `reminder`
-- Werktage und Wochenende getrennt aktivieren und mit Zeitfenstern versehen
+- Werktage und Wochenende mit kompakten Zeitfenstern wie `08:00-22:00` versehen
 - DND-Zeit pro Person konfigurieren
 - optional nur zustellen, wenn die Person zuhause ist
-- optionaler Fallback pro Person, wenn ein direkter Empfaenger gerade nicht erreichbar ist
 - kritische Nachrichten immer zustellen, unabhaengig von Zeit, DND und Anwesenheit
 - Icons vor dem Titel und persistente Home-Assistant-Benachrichtigung fuer `warning` und `critical`
 
@@ -19,7 +18,7 @@ Die Action erwartet im Kern:
 1. `title`
 2. `message`
 3. `type`: `critical`, `info`, `warning` oder `reminder`
-4. `target`: `all` oder ein in der UI konfigurierter Target-Name wie `johannes`
+4. `target`: leer/`all` fuer alle oder eine bzw. mehrere `person.*` Entitaeten
 
 ## Installation
 
@@ -42,9 +41,15 @@ Die Action erwartet im Kern:
 4. Suche nach **Notification Dispatcher**.
 5. Oeffne danach die Optionen der Integration und fuege Personen hinzu.
 
-Als Notify-Ziel kannst du klassische Mobile-App-Actions wie `notify.mobile_app_johans_iphone` oder moderne Notify-Entitaeten wie `notify.johans_iphone` eintragen. Mehrere Ziele werden mit Komma getrennt.
+Beim Hinzufuegen einer Person waehlst du direkt die vorhandene `person.*` Entitaet aus Home Assistant aus. Danach hinterlegst du ein oder mehrere Mobile-App-Ziele. Die Integration bietet vorhandene `notify.*` Ziele an; du kannst aber weiterhin eigene Werte wie `notify.mobile_app_jmi_iphone` eintragen.
 
-Jede Person bekommt einen eigenen Target-Namen, z.B. `johannes` oder `linda`. Der Name `all` ist reserviert. Wenn eine Person einen Fallback-Target-Namen bekommt, wird eine direkte Nachricht an diese Person an den Fallback geschickt, falls sie wegen Abwesenheit, Zeitfenster oder DND gerade nicht erreichbar ist.
+Zeitfenster werden kompakt eingetragen:
+
+- Werktage: `08:00-22:00`
+- Wochenende: `09:00-22:00`
+- Ruhezeit/DND: `22:00-07:00`
+
+Ein leeres Werktag- oder Wochenende-Feld bedeutet: an diesen Tagen nicht zustellen. Eine leere Ruhezeit bedeutet: keine DND-Sperre.
 
 ## Action nutzen
 
@@ -54,7 +59,6 @@ data:
   title: "Waschmaschine"
   message: "Die Waesche ist fertig."
   type: reminder
-  target: all
 ```
 
 Nur bestimmte Personen:
@@ -65,7 +69,8 @@ data:
   title: "Tuere"
   message: "Die Haustuer steht offen."
   type: warning
-  target: johannes
+  target:
+    - person.johannes
 ```
 
 Kritisch:
@@ -87,7 +92,6 @@ data:
   title: "Garage"
   message: "Das Garagentor ist noch offen."
   type: warning
-  target: all
   data:
     tag: garage-door
     group: security
@@ -102,7 +106,6 @@ data:
   title: "Test"
   message: "Wuerde so zugestellt werden."
   type: info
-  target: all
   dry_run: true
 ```
 
