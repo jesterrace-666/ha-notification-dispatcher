@@ -27,6 +27,9 @@ from .const import (
     CONF_DND_START,
     CONF_DND_WINDOW,
     CONF_ENABLED_TYPES,
+    CONF_GROUP_ID,
+    CONF_GROUP_MEMBERS,
+    CONF_GROUPS,
     CONF_NAME,
     CONF_NOTIFY_TARGETS,
     CONF_ONLY_WHEN_HOME,
@@ -50,7 +53,7 @@ from .const import (
 )
 
 _WINDOW_SPLITTER = re.compile(r"\s*(?:-|\bbis\b|\bto\b)\s*", re.IGNORECASE)
-_IGNORED_NOTIFY_SERVICES = {"persistent_notification", "send_message"}
+TARGET_ALL_ALIASES = {"all", "alle"}
 
 
 class InvalidTimeWindow(ValueError):
@@ -75,7 +78,7 @@ class NotificationDispatcherConfigFlow(config_entries.ConfigFlow, domain=DOMAIN)
         return self.async_create_entry(
             title=NAME,
             data={},
-            options={CONF_PROFILES: []},
+            options={CONF_PROFILES: [], CONF_GROUPS: []},
         )
 
     @staticmethod
@@ -96,7 +99,9 @@ class NotificationDispatcherOptionsFlow(config_entries.OptionsFlowWithReload):
         """Show the options menu."""
         menu_options = ["add_person"]
         if self._profiles:
-            menu_options.extend(["edit_person", "remove_person"])
+            menu_options.extend(["edit_person", "remove_person", "add_group"])
+        if self._groups:
+            menu_options.extend(["edit_group", "remove_group"])
 
         return self.async_show_menu(step_id="init", menu_options=menu_options)
 
@@ -112,7 +117,9 @@ class NotificationDispatcherOptionsFlow(config_entries.OptionsFlowWithReload):
                 errors = _profile_errors(self._profiles, profile)
                 if not errors:
                     profiles = [*self._profiles, profile]
-                    return self.async_create_entry(data={CONF_PROFILES: profiles})
+                    return self.async_create_entry(
+                        data=self._updated_options(profiles=profiles)
+                    )
 
         return self.async_show_form(
             step_id="add_person",
@@ -166,7 +173,9 @@ class NotificationDispatcherOptionsFlow(config_entries.OptionsFlowWithReload):
                         else item
                         for item in self._profiles
                     ]
-                    return self.async_create_entry(data={CONF_PROFILES: profiles})
+                    return self.async_create_entry(
+                        data=self._updated_options(profiles=profiles)
+                    )
 
         return self.async_show_form(
             step_id="edit_details",
@@ -183,7 +192,13 @@ class NotificationDispatcherOptionsFlow(config_entries.OptionsFlowWithReload):
                 for profile in self._profiles
                 if profile.get(CONF_PROFILE_ID) != profile_id
             ]
-            return self.async_create_entry(data={CONF_PROFILES: profiles})
+            groups = [
+                _group_without_member(group, profile_id)
+                for group in self._groups
+            ]
+            return self.async_create_entry(
+                data=self._updated_options(profiles=profiles, groups=groups)
+            )
 
         return self.async_show_form(
             step_id="remove_person",
@@ -196,10 +211,110 @@ class NotificationDispatcherOptionsFlow(config_entries.OptionsFlowWithReload):
             ),
         )
 
+    async def async_step_add_group(self, user_input: dict[str, Any] | None = None):
+        """Add a notification group."""
+        if not self._profiles:
+            return await self.async_step_init()
+
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            group = _group_from_user_input(user_input)
+            errors = _group_errors(self._groups, group)
+            if not errors:
+                groups = [*self._groups, group]
+                return self.async_create_entry(
+                    data=self._updated_options(groups=groups)
+                )
+
+        return self.async_show_form(
+            step_id="add_group",
+            data_schema=_group_schema(self._profiles),
+            errors=errors,
+        )
+
+    async def async_step_edit_group(self, user_input: dict[str, Any] | None = None):
+        """Select a notification group to edit."""
+        if user_input is not None:
+            self._selected_profile_id = user_input[CONF_GROUP_ID]
+            return await self.async_step_edit_group_details()
+
+        return self.async_show_form(
+            step_id="edit_group",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_GROUP_ID): SelectSelector(
+                        SelectSelectorConfig(options=_group_select_options(self._groups))
+                    )
+                }
+            ),
+        )
+
+    async def async_step_edit_group_details(
+        self, user_input: dict[str, Any] | None = None
+    ):
+        """Edit a selected notification group."""
+        group = self._selected_group
+        if group is None:
+            return await self.async_step_init()
+
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            updated_group = _group_from_user_input(user_input, existing=group)
+            errors = _group_errors(
+                self._groups,
+                updated_group,
+                updated_group[CONF_GROUP_ID],
+            )
+            if not errors:
+                groups = [
+                    updated_group
+                    if item.get(CONF_GROUP_ID) == updated_group[CONF_GROUP_ID]
+                    else item
+                    for item in self._groups
+                ]
+                return self.async_create_entry(
+                    data=self._updated_options(groups=groups)
+                )
+
+        return self.async_show_form(
+            step_id="edit_group_details",
+            data_schema=_group_schema(self._profiles, group),
+            errors=errors,
+        )
+
+    async def async_step_remove_group(self, user_input: dict[str, Any] | None = None):
+        """Remove a notification group."""
+        if user_input is not None:
+            group_id = user_input[CONF_GROUP_ID]
+            groups = [
+                group
+                for group in self._groups
+                if group.get(CONF_GROUP_ID) != group_id
+            ]
+            return self.async_create_entry(
+                data=self._updated_options(groups=groups)
+            )
+
+        return self.async_show_form(
+            step_id="remove_group",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_GROUP_ID): SelectSelector(
+                        SelectSelectorConfig(options=_group_select_options(self._groups))
+                    )
+                }
+            ),
+        )
+
     @property
     def _profiles(self) -> list[dict[str, Any]]:
         """Return configured profiles."""
         return list(self.config_entry.options.get(CONF_PROFILES, []))
+
+    @property
+    def _groups(self) -> list[dict[str, Any]]:
+        """Return configured notification groups."""
+        return list(self.config_entry.options.get(CONF_GROUPS, []))
 
     @property
     def _selected_profile(self) -> dict[str, Any] | None:
@@ -210,6 +325,28 @@ class NotificationDispatcherOptionsFlow(config_entries.OptionsFlowWithReload):
             if profile.get(CONF_PROFILE_ID) == self._selected_profile_id:
                 return profile
         return None
+
+    @property
+    def _selected_group(self) -> dict[str, Any] | None:
+        """Return the selected notification group."""
+        if self._selected_profile_id is None:
+            return None
+        for group in self._groups:
+            if group.get(CONF_GROUP_ID) == self._selected_profile_id:
+                return group
+        return None
+
+    def _updated_options(
+        self,
+        *,
+        profiles: list[dict[str, Any]] | None = None,
+        groups: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
+        """Return options while preserving unrelated values."""
+        options = dict(self.config_entry.options)
+        options[CONF_PROFILES] = self._profiles if profiles is None else profiles
+        options[CONF_GROUPS] = self._groups if groups is None else groups
+        return options
 
 
 def _profile_schema(
@@ -227,14 +364,8 @@ def _profile_schema(
             ): EntitySelector(EntitySelectorConfig(domain="person")),
             vol.Required(
                 CONF_NOTIFY_TARGETS,
-                default=_targets_to_form(profile.get(CONF_NOTIFY_TARGETS, [])),
-            ): SelectSelector(
-                SelectSelectorConfig(
-                    options=_notify_target_options(hass),
-                    multiple=True,
-                    custom_value=True,
-                )
-            ),
+                default=_targets_to_text(profile.get(CONF_NOTIFY_TARGETS, [])),
+            ): TextSelector(),
             vol.Optional(
                 CONF_ENABLED_TYPES,
                 default=_optional_enabled_types(profile.get(CONF_ENABLED_TYPES, [])),
@@ -295,17 +426,22 @@ def _profile_from_user_input(
     enabled_types = set(user_input.get(CONF_ENABLED_TYPES, []))
     enabled_types.add(TYPE_CRITICAL)
 
-    person_entity_id = user_input[CONF_PERSON_ENTITY_ID]
+    person_entity_id = str(user_input.get(CONF_PERSON_ENTITY_ID, "")).strip()
     known_targets = _known_notify_targets(hass)
+
+    target_key = (
+        existing.get(CONF_TARGET_KEY)
+        if existing.get(CONF_PERSON_ENTITY_ID) == person_entity_id
+        else _target_key_from_person_entity(person_entity_id)
+    )
 
     return {
         CONF_PROFILE_ID: existing.get(CONF_PROFILE_ID, uuid4().hex),
         CONF_NAME: _person_name(hass, person_entity_id),
-        CONF_TARGET_KEY: existing.get(CONF_TARGET_KEY)
-        or _target_key_from_person_entity(person_entity_id),
+        CONF_TARGET_KEY: target_key or _target_key_from_person_entity(person_entity_id),
         CONF_PERSON_ENTITY_ID: person_entity_id,
         CONF_NOTIFY_TARGETS: _targets_from_input(
-            user_input[CONF_NOTIFY_TARGETS],
+            user_input.get(CONF_NOTIFY_TARGETS, ""),
             known_targets,
         ),
         CONF_ENABLED_TYPES: sorted(enabled_types),
@@ -338,6 +474,8 @@ def _profile_errors(
 
     if not profile[CONF_NOTIFY_TARGETS]:
         errors[CONF_NOTIFY_TARGETS] = "missing_notify_target"
+    if not profile[CONF_PERSON_ENTITY_ID]:
+        errors[CONF_PERSON_ENTITY_ID] = "missing_person"
 
     if _person_exists(
         profiles,
@@ -368,6 +506,115 @@ def _profile_label(profile: dict[str, Any]) -> str:
     if target_count <= 1:
         return str(name)
     return f"{name} ({target_count} Ziele)"
+
+
+def _group_schema(
+    profiles: list[dict[str, Any]],
+    group: dict[str, Any] | None = None,
+) -> vol.Schema:
+    """Build the group schema."""
+    group = group or {}
+    return vol.Schema(
+        {
+            vol.Required(CONF_NAME, default=group.get(CONF_NAME, "")): TextSelector(),
+            vol.Required(
+                CONF_GROUP_MEMBERS,
+                default=list(group.get(CONF_GROUP_MEMBERS, [])),
+            ): SelectSelector(
+                SelectSelectorConfig(
+                    options=_profile_select_options(profiles),
+                    multiple=True,
+                )
+            ),
+        }
+    )
+
+
+def _group_from_user_input(
+    user_input: dict[str, Any],
+    existing: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Create a stored group from form input."""
+    existing = existing or {}
+    name = str(user_input.get(CONF_NAME, "")).strip()
+    target_key = (
+        existing.get(CONF_TARGET_KEY)
+        if existing.get(CONF_NAME) == name
+        else _normalize_target_key(name)
+    )
+    return {
+        CONF_GROUP_ID: existing.get(CONF_GROUP_ID, uuid4().hex),
+        CONF_NAME: name,
+        CONF_TARGET_KEY: target_key or _normalize_target_key(name),
+        CONF_GROUP_MEMBERS: _ensure_list(user_input.get(CONF_GROUP_MEMBERS)),
+    }
+
+
+def _group_errors(
+    groups: list[dict[str, Any]],
+    group: dict[str, Any],
+    current_group_id: str | None = None,
+) -> dict[str, str]:
+    """Validate a group and return Home Assistant form errors."""
+    errors: dict[str, str] = {}
+    target_key = _normalize_target_key(group.get(CONF_TARGET_KEY))
+
+    if not group.get(CONF_NAME):
+        errors[CONF_NAME] = "missing_group_name"
+    elif target_key in TARGET_ALL_ALIASES:
+        errors[CONF_NAME] = "reserved_group_name"
+    elif _group_key_exists(groups, target_key, current_group_id):
+        errors[CONF_NAME] = "duplicate_group"
+
+    if not group.get(CONF_GROUP_MEMBERS):
+        errors[CONF_GROUP_MEMBERS] = "missing_group_members"
+
+    return errors
+
+
+def _group_key_exists(
+    groups: list[dict[str, Any]],
+    target_key: str,
+    current_group_id: str | None = None,
+) -> bool:
+    """Return whether a group key is already used by another group."""
+    for group in groups:
+        if group.get(CONF_GROUP_ID) == current_group_id:
+            continue
+        if _normalize_target_key(group.get(CONF_TARGET_KEY)) == target_key:
+            return True
+        if _normalize_target_key(group.get(CONF_NAME)) == target_key:
+            return True
+    return False
+
+
+def _group_select_options(groups: list[dict[str, Any]]) -> list[dict[str, str]]:
+    """Build select options for groups."""
+    return [
+        {
+            "value": group[CONF_GROUP_ID],
+            "label": _group_label(group),
+        }
+        for group in groups
+    ]
+
+
+def _group_label(group: dict[str, Any]) -> str:
+    """Return a human readable group label."""
+    members = group.get(CONF_GROUP_MEMBERS, [])
+    member_count = len(members) if isinstance(members, list) else 0
+    return f"{group.get(CONF_NAME, 'Gruppe')} ({member_count} Personen)"
+
+
+def _group_without_member(group: dict[str, Any], profile_id: str) -> dict[str, Any]:
+    """Return a group with one profile removed."""
+    updated_group = dict(group)
+    updated_group[CONF_GROUP_MEMBERS] = [
+        member_id
+        for member_id in _ensure_list(group.get(CONF_GROUP_MEMBERS))
+        if member_id != profile_id
+    ]
+    return updated_group
 
 
 def _person_name(hass: HomeAssistant, person_entity_id: str) -> str:
@@ -406,7 +653,7 @@ def _known_notify_targets(hass: HomeAssistant) -> set[str]:
 
     notify_services = hass.services.async_services().get("notify", {})
     for service in notify_services:
-        if service in _IGNORED_NOTIFY_SERVICES:
+        if service in {"persistent_notification", "send_message"}:
             continue
         targets.add(f"notify.{service}")
 
@@ -414,28 +661,6 @@ def _known_notify_targets(hass: HomeAssistant) -> set[str]:
         targets.add(entity_id)
 
     return targets
-
-
-def _notify_target_options(hass: HomeAssistant) -> list[dict[str, str]]:
-    """Build selector options for available notify targets."""
-    return [
-        {
-            "value": target,
-            "label": _notify_target_label(hass, target),
-        }
-        for target in sorted(_known_notify_targets(hass))
-    ]
-
-
-def _notify_target_label(hass: HomeAssistant, target: str) -> str:
-    """Return a readable label for a notify target."""
-    state = hass.states.get(target)
-    if state is not None:
-        friendly_name = state.attributes.get("friendly_name")
-        if friendly_name:
-            return f"{friendly_name} ({target})"
-
-    return target.removeprefix("notify.").replace("_", " ")
 
 
 def _targets_from_input(value: Any, known_targets: set[str]) -> list[str]:
@@ -474,13 +699,13 @@ def _normalize_notify_target(value: Any, known_targets: set[str]) -> str:
     return notify_target
 
 
-def _targets_to_form(value: Any) -> list[str]:
+def _targets_to_text(value: Any) -> str:
     """Render notify targets for the options form."""
     if isinstance(value, str):
-        return _targets_from_input(value, set())
+        return value
     if isinstance(value, list):
-        return [str(item) for item in value if str(item).strip()]
-    return []
+        return ", ".join(str(item) for item in value if str(item).strip())
+    return ""
 
 
 def _optional_enabled_types(value: Any) -> list[str]:
@@ -555,6 +780,15 @@ def _format_time(value: Any) -> str:
         return _normalize_time_part(value)
     except (TypeError, ValueError):
         return "00:00"
+
+
+def _ensure_list(value: Any) -> list[Any]:
+    """Return form data as a list."""
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return value
+    return [value]
 
 
 def _normalize_target_key(value: Any) -> str:
