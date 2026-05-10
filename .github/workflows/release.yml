@@ -18,14 +18,15 @@ jobs:
       - name: Create or update release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v0.2.0
-          name: v0.2.0
+          tag_name: v0.2.1
+          name: v0.2.1
           target_commitish: main
           make_latest: true
           body: |
-            Notification Dispatcher v0.2.0
+            Notification Dispatcher v0.2.1
 
             - Removes the custom instance name prompt during setup.
+            - Normalizes existing config entry titles to Notification Dispatcher.
             - Simplifies person configuration to HA person + mobile app targets.
             - Replaces separate time widgets with compact windows like 08:00-22:00.
             - Removes fallback target configuration.
