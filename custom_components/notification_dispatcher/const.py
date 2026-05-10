@@ -1,0 +1,51 @@
+"""Constants for the Notification Dispatcher integration."""
+
+DOMAIN = "notification_dispatcher"
+NAME = "Notification Dispatcher"
+
+SERVICE_SEND = "send"
+
+CONF_INSTANCE_NAME = "instance_name"
+CONF_PROFILES = "profiles"
+CONF_PROFILE_ID = "id"
+CONF_NAME = "name"
+CONF_PERSON_ENTITY_ID = "person_entity_id"
+CONF_NOTIFY_TARGETS = "notify_targets"
+CONF_ENABLED_TYPES = "enabled_types"
+CONF_ONLY_WHEN_HOME = "only_when_home"
+CONF_ALLOW_WEEKDAYS = "allow_weekdays"
+CONF_WEEKDAY_START = "weekday_start"
+CONF_WEEKDAY_END = "weekday_end"
+CONF_ALLOW_WEEKENDS = "allow_weekends"
+CONF_WEEKEND_START = "weekend_start"
+CONF_WEEKEND_END = "weekend_end"
+CONF_DND_ENABLED = "dnd_enabled"
+CONF_DND_START = "dnd_start"
+CONF_DND_END = "dnd_end"
+
+ATTR_CONFIG_ENTRY_ID = "config_entry_id"
+ATTR_TITLE = "title"
+ATTR_MESSAGE = "message"
+ATTR_TYPE = "type"
+ATTR_TARGET = "target"
+ATTR_TARGET_ALL = "target_all"
+ATTR_RECIPIENTS = "recipients"
+ATTR_DATA = "data"
+ATTR_DRY_RUN = "dry_run"
+ATTR_CONTINUE_ON_ERROR = "continue_on_error"
+
+TYPE_CRITICAL = "critical"
+TYPE_WARNING = "warning"
+TYPE_INFO = "info"
+TYPE_REMINDER = "reminder"
+
+NOTIFICATION_TYPES = [TYPE_CRITICAL, TYPE_WARNING, TYPE_INFO, TYPE_REMINDER]
+OPTIONAL_NOTIFICATION_TYPES = [TYPE_WARNING, TYPE_INFO, TYPE_REMINDER]
+DEFAULT_NOTIFICATION_TYPE = TYPE_INFO
+
+DEFAULT_WEEKDAY_START = "08:00:00"
+DEFAULT_WEEKDAY_END = "22:00:00"
+DEFAULT_WEEKEND_START = "09:00:00"
+DEFAULT_WEEKEND_END = "22:00:00"
+DEFAULT_DND_START = "22:00:00"
+DEFAULT_DND_END = "07:00:00"
