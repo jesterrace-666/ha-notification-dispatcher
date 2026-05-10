@@ -1,7 +1,7 @@
 {
   "domain": "notification_dispatcher",
   "name": "Notification Dispatcher",
-  "codeowners": [],
+  "codeowners": ["@jesterrace-666"],
   "config_flow": true,
   "dependencies": ["notify", "person"],
   "documentation": "https://github.com/jesterrace-666/ha-notification-dispatcher",
