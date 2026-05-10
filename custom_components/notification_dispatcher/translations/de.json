@@ -4,10 +4,7 @@
     "step": {
       "user": {
         "title": "Notification Dispatcher einrichten",
-        "description": "Erstellt den Dispatcher. Personen fuegst du danach ueber die Optionen der Integration hinzu.",
-        "data": {
-          "instance_name": "Name"
-        }
+        "description": "Erstellt den Dispatcher. Personen fuegst du danach ueber die Optionen der Integration hinzu."
       }
     },
     "abort": {
@@ -26,24 +23,15 @@
       },
       "add_person": {
         "title": "Person hinzufuegen",
-        "description": "Kritische Nachrichten werden immer zugestellt. Waehle hier die zusaetzlichen Typen, die diese Person erhalten soll.",
+        "description": "Waehle eine Home-Assistant-Person und die Mobile-App-Ziele dieser Person. Zeitfenster werden als 08:00-22:00 eingetragen; leer bedeutet bei Werktag/Wochenende keine Zustellung und bei Ruhezeit keine Ruhezeit. Kritische Nachrichten gehen immer durch.",
         "data": {
-          "name": "Name",
-          "target_key": "Target-Name",
           "person_entity_id": "Person",
-          "notify_targets": "Notify-Ziele",
-          "fallback_target_key": "Fallback-Target-Name",
+          "notify_targets": "Mobile-App-Ziele",
           "enabled_types": "Zusaetzliche Nachrichtentypen",
           "only_when_home": "Nur wenn zuhause",
-          "allow_weekdays": "Werktage erlauben",
-          "weekday_start": "Start Werktage",
-          "weekday_end": "Ende Werktage",
-          "allow_weekends": "Wochenende erlauben",
-          "weekend_start": "Start Wochenende",
-          "weekend_end": "Ende Wochenende",
-          "dnd_enabled": "DND aktivieren",
-          "dnd_start": "DND Start",
-          "dnd_end": "DND Ende"
+          "weekday_window": "Werktage",
+          "weekend_window": "Wochenende",
+          "dnd_window": "Ruhezeit"
         }
       },
       "edit_person": {
@@ -54,24 +42,15 @@
       },
       "edit_details": {
         "title": "Person bearbeiten",
-        "description": "Kritische Nachrichten werden immer zugestellt. Waehle hier die zusaetzlichen Typen, die diese Person erhalten soll.",
+        "description": "Waehle eine Home-Assistant-Person und die Mobile-App-Ziele dieser Person. Zeitfenster werden als 08:00-22:00 eingetragen; leer bedeutet bei Werktag/Wochenende keine Zustellung und bei Ruhezeit keine Ruhezeit. Kritische Nachrichten gehen immer durch.",
         "data": {
-          "name": "Name",
-          "target_key": "Target-Name",
           "person_entity_id": "Person",
-          "notify_targets": "Notify-Ziele",
-          "fallback_target_key": "Fallback-Target-Name",
+          "notify_targets": "Mobile-App-Ziele",
           "enabled_types": "Zusaetzliche Nachrichtentypen",
           "only_when_home": "Nur wenn zuhause",
-          "allow_weekdays": "Werktage erlauben",
-          "weekday_start": "Start Werktage",
-          "weekday_end": "Ende Werktage",
-          "allow_weekends": "Wochenende erlauben",
-          "weekend_start": "Start Wochenende",
-          "weekend_end": "Ende Wochenende",
-          "dnd_enabled": "DND aktivieren",
-          "dnd_start": "DND Start",
-          "dnd_end": "DND Ende"
+          "weekday_window": "Werktage",
+          "weekend_window": "Wochenende",
+          "dnd_window": "Ruhezeit"
         }
       },
       "remove_person": {
@@ -83,8 +62,8 @@
     },
     "error": {
       "missing_notify_target": "Fuege mindestens ein Notify-Ziel hinzu.",
-      "duplicate_target_key": "Dieser Target-Name wird bereits von einer anderen Person verwendet.",
-      "reserved_target_key": "Der Target-Name all ist reserviert."
+      "duplicate_person": "Diese Person ist bereits im Dispatcher angelegt.",
+      "invalid_time_window": "Bitte als Zeitfenster eintragen, zum Beispiel 08:00-22:00."
     }
   }
 }
