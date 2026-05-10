@@ -18,12 +18,15 @@
         "menu_options": {
           "add_person": "Person hinzufuegen",
           "edit_person": "Person bearbeiten",
-          "remove_person": "Person entfernen"
+          "remove_person": "Person entfernen",
+          "add_group": "Gruppe hinzufuegen",
+          "edit_group": "Gruppe bearbeiten",
+          "remove_group": "Gruppe entfernen"
         }
       },
       "add_person": {
         "title": "Person hinzufuegen",
-        "description": "Waehle eine Home-Assistant-Person und die Mobile-App-Ziele dieser Person. Zeitfenster werden als 08:00-22:00 eingetragen; leer bedeutet bei Werktag/Wochenende keine Zustellung und bei Ruhezeit keine Ruhezeit. Kritische Nachrichten gehen immer durch.",
+        "description": "Waehle eine Home-Assistant-Person und trage die Mobile-App-Ziele ein, zum Beispiel notify.mobile_app_jmi_iphone. Mehrere Ziele mit Komma trennen. Das Ziel alle/all ist fest eingebaut und nicht loeschbar.",
         "data": {
           "person_entity_id": "Person",
           "notify_targets": "Mobile-App-Ziele",
@@ -42,7 +45,7 @@
       },
       "edit_details": {
         "title": "Person bearbeiten",
-        "description": "Waehle eine Home-Assistant-Person und die Mobile-App-Ziele dieser Person. Zeitfenster werden als 08:00-22:00 eingetragen; leer bedeutet bei Werktag/Wochenende keine Zustellung und bei Ruhezeit keine Ruhezeit. Kritische Nachrichten gehen immer durch.",
+        "description": "Waehle eine Home-Assistant-Person und trage die Mobile-App-Ziele ein, zum Beispiel notify.mobile_app_jmi_iphone. Mehrere Ziele mit Komma trennen. Das Ziel alle/all ist fest eingebaut und nicht loeschbar.",
         "data": {
           "person_entity_id": "Person",
           "notify_targets": "Mobile-App-Ziele",
@@ -58,12 +61,45 @@
         "data": {
           "id": "Person"
         }
+      },
+      "add_group": {
+        "title": "Gruppe hinzufuegen",
+        "description": "Das Ziel alle/all ist immer vorhanden. Hier kannst du zusaetzliche Gruppen aus deinen Personen bauen, zum Beispiel Familie oder Eltern.",
+        "data": {
+          "name": "Gruppenname",
+          "group_members": "Personen"
+        }
+      },
+      "edit_group": {
+        "title": "Gruppe auswaehlen",
+        "data": {
+          "group_id": "Gruppe"
+        }
+      },
+      "edit_group_details": {
+        "title": "Gruppe bearbeiten",
+        "description": "Passe Name und Personen dieser Gruppe an. alle/all bleibt automatisch vorhanden und kann nicht entfernt werden.",
+        "data": {
+          "name": "Gruppenname",
+          "group_members": "Personen"
+        }
+      },
+      "remove_group": {
+        "title": "Gruppe entfernen",
+        "data": {
+          "group_id": "Gruppe"
+        }
       }
     },
     "error": {
       "missing_notify_target": "Fuege mindestens ein Notify-Ziel hinzu.",
+      "missing_person": "Waehle eine Person aus.",
       "duplicate_person": "Diese Person ist bereits im Dispatcher angelegt.",
-      "invalid_time_window": "Bitte als Zeitfenster eintragen, zum Beispiel 08:00-22:00."
+      "invalid_time_window": "Bitte als Zeitfenster eintragen, zum Beispiel 08:00-22:00.",
+      "missing_group_name": "Gib einen Gruppennamen ein.",
+      "missing_group_members": "Waehle mindestens eine Person fuer die Gruppe aus.",
+      "duplicate_group": "Diese Gruppe gibt es bereits.",
+      "reserved_group_name": "alle/all ist fest eingebaut und kann nicht als Gruppe verwendet werden."
     }
   }
 }
