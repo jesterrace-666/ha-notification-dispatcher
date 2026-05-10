@@ -36,18 +36,16 @@ send:
             - info
             - reminder
     target:
-      name: Target
-      description: Configured recipient key, for example johannes, linda, or all.
+      name: People
+      description: Home Assistant people to notify. Leave empty to notify all configured people.
       required: false
-      default: all
       selector:
-        select:
-          custom_value: true
-          options:
-            - all
+        entity:
+          domain: person
+          multiple: true
     recipients:
       name: Recipients
-      description: Legacy field. Prefer Target.
+      description: Legacy field for old automations. Prefer People.
       required: false
       advanced: true
       selector:
