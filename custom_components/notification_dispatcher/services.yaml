@@ -1,0 +1,85 @@
+send:
+  name: Send notification
+  description: Dispatch a notification to configured people according to their rules.
+  fields:
+    config_entry_id:
+      name: Config entry
+      description: Optional dispatcher configuration to use.
+      required: false
+      advanced: true
+      selector:
+        config_entry:
+          integration: notification_dispatcher
+    title:
+      name: Title
+      description: Notification title.
+      required: false
+      selector:
+        text:
+    message:
+      name: Message
+      description: Notification message.
+      required: true
+      selector:
+        text:
+          multiline: true
+    type:
+      name: Type
+      description: Delivery type. Critical bypasses schedule, DND, and home checks.
+      required: false
+      default: info
+      selector:
+        select:
+          options:
+            - critical
+            - warning
+            - info
+            - reminder
+    target_all:
+      name: All
+      description: Send to all configured people.
+      required: false
+      default: true
+      selector:
+        boolean:
+    target:
+      name: Target
+      description: People to notify when All is disabled.
+      required: false
+      selector:
+        entity:
+          domain: person
+          multiple: true
+    recipients:
+      name: Recipients
+      description: Legacy field for profile names, person entity IDs, or profile IDs. Prefer Target.
+      required: false
+      advanced: true
+      selector:
+        select:
+          custom_value: true
+          multiple: true
+          options: []
+    data:
+      name: Data
+      description: Optional raw data passed through to the notify action.
+      required: false
+      advanced: true
+      selector:
+        object:
+    dry_run:
+      name: Dry run
+      description: Evaluate recipients without sending notifications.
+      required: false
+      default: false
+      advanced: true
+      selector:
+        boolean:
+    continue_on_error:
+      name: Continue on error
+      description: Continue sending to other targets if one notify target fails.
+      required: false
+      default: true
+      advanced: true
+      selector:
+        boolean:
