@@ -29,8 +29,10 @@
         "description": "Kritische Nachrichten werden immer zugestellt. Waehle hier die zusaetzlichen Typen, die diese Person erhalten soll.",
         "data": {
           "name": "Name",
+          "target_key": "Target-Name",
           "person_entity_id": "Person",
           "notify_targets": "Notify-Ziele",
+          "fallback_target_key": "Fallback-Target-Name",
           "enabled_types": "Zusaetzliche Nachrichtentypen",
           "only_when_home": "Nur wenn zuhause",
           "allow_weekdays": "Werktage erlauben",
@@ -55,8 +57,10 @@
         "description": "Kritische Nachrichten werden immer zugestellt. Waehle hier die zusaetzlichen Typen, die diese Person erhalten soll.",
         "data": {
           "name": "Name",
+          "target_key": "Target-Name",
           "person_entity_id": "Person",
           "notify_targets": "Notify-Ziele",
+          "fallback_target_key": "Fallback-Target-Name",
           "enabled_types": "Zusaetzliche Nachrichtentypen",
           "only_when_home": "Nur wenn zuhause",
           "allow_weekdays": "Werktage erlauben",
@@ -78,7 +82,9 @@
       }
     },
     "error": {
-      "missing_notify_target": "Fuege mindestens ein Notify-Ziel hinzu."
+      "missing_notify_target": "Fuege mindestens ein Notify-Ziel hinzu.",
+      "duplicate_target_key": "Dieser Target-Name wird bereits von einer anderen Person verwendet.",
+      "reserved_target_key": "Der Target-Name all ist reserviert."
     }
   }
 }
