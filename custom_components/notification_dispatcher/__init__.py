@@ -26,6 +26,7 @@ from .const import (
     ATTR_TYPE,
     DEFAULT_NOTIFICATION_TYPE,
     DOMAIN,
+    NAME,
     NOTIFICATION_TYPES,
     SERVICE_SEND,
 )
@@ -80,6 +81,9 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Notification Dispatcher from a config entry."""
+    if entry.title != NAME:
+        hass.config_entries.async_update_entry(entry, title=NAME)
+
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = NotificationDispatcher(
         hass, entry
     )
