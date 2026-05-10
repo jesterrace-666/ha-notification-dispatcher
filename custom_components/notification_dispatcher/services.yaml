@@ -36,16 +36,19 @@ send:
             - info
             - reminder
     target:
-      name: People
-      description: Home Assistant people to notify. Leave empty to notify all configured people.
+      name: Targets
+      description: Built-in all/alle target, a person entity, a person name, or a configured dispatcher group. Leave empty to notify all configured people.
       required: false
       selector:
-        entity:
-          domain: person
+        select:
+          custom_value: true
           multiple: true
+          options:
+            - all
+            - alle
     recipients:
       name: Recipients
-      description: Legacy field for old automations. Prefer People.
+      description: Legacy field for old automations. Prefer Targets.
       required: false
       advanced: true
       selector:
