@@ -26,6 +26,7 @@ from .const import (
     CONF_DND_END,
     CONF_DND_START,
     CONF_ENABLED_TYPES,
+    CONF_FALLBACK_TARGET_KEY,
     CONF_INSTANCE_NAME,
     CONF_NAME,
     CONF_NOTIFY_TARGETS,
@@ -33,6 +34,7 @@ from .const import (
     CONF_PERSON_ENTITY_ID,
     CONF_PROFILE_ID,
     CONF_PROFILES,
+    CONF_TARGET_KEY,
     CONF_WEEKDAY_END,
     CONF_WEEKDAY_START,
     CONF_WEEKEND_END,
@@ -46,6 +48,7 @@ from .const import (
     DOMAIN,
     NAME,
     OPTIONAL_NOTIFICATION_TYPES,
+    TARGET_ALL,
     TYPE_CRITICAL,
 )
 
@@ -103,6 +106,10 @@ class NotificationDispatcherOptionsFlow(config_entries.OptionsFlowWithReload):
             profile = _profile_from_user_input(user_input)
             if not profile[CONF_NOTIFY_TARGETS]:
                 errors[CONF_NOTIFY_TARGETS] = "missing_notify_target"
+            elif profile[CONF_TARGET_KEY] == TARGET_ALL:
+                errors[CONF_TARGET_KEY] = "reserved_target_key"
+            elif _target_key_exists(self._profiles, profile[CONF_TARGET_KEY]):
+                errors[CONF_TARGET_KEY] = "duplicate_target_key"
             else:
                 profiles = [*self._profiles, profile]
                 return self.async_create_entry(data={CONF_PROFILES: profiles})
@@ -141,6 +148,14 @@ class NotificationDispatcherOptionsFlow(config_entries.OptionsFlowWithReload):
             updated_profile = _profile_from_user_input(user_input, existing=profile)
             if not updated_profile[CONF_NOTIFY_TARGETS]:
                 errors[CONF_NOTIFY_TARGETS] = "missing_notify_target"
+            elif updated_profile[CONF_TARGET_KEY] == TARGET_ALL:
+                errors[CONF_TARGET_KEY] = "reserved_target_key"
+            elif _target_key_exists(
+                self._profiles,
+                updated_profile[CONF_TARGET_KEY],
+                updated_profile[CONF_PROFILE_ID],
+            ):
+                errors[CONF_TARGET_KEY] = "duplicate_target_key"
             else:
                 profiles = [
                     updated_profile
@@ -202,12 +217,20 @@ def _profile_schema(profile: dict[str, Any] | None = None) -> vol.Schema:
         {
             vol.Required(CONF_NAME, default=profile.get(CONF_NAME, "")): TextSelector(),
             vol.Required(
+                CONF_TARGET_KEY,
+                default=profile.get(CONF_TARGET_KEY, ""),
+            ): TextSelector(),
+            vol.Required(
                 CONF_PERSON_ENTITY_ID,
                 default=profile.get(CONF_PERSON_ENTITY_ID),
             ): EntitySelector(EntitySelectorConfig(domain="person")),
             vol.Required(
                 CONF_NOTIFY_TARGETS,
                 default=_targets_to_text(profile.get(CONF_NOTIFY_TARGETS, [])),
+            ): TextSelector(),
+            vol.Optional(
+                CONF_FALLBACK_TARGET_KEY,
+                default=profile.get(CONF_FALLBACK_TARGET_KEY, ""),
             ): TextSelector(),
             vol.Optional(
                 CONF_ENABLED_TYPES,
@@ -273,8 +296,14 @@ def _profile_from_user_input(
     return {
         CONF_PROFILE_ID: existing.get(CONF_PROFILE_ID, uuid4().hex),
         CONF_NAME: user_input[CONF_NAME],
+        CONF_TARGET_KEY: _normalize_target_key(
+            user_input.get(CONF_TARGET_KEY) or user_input[CONF_NAME]
+        ),
         CONF_PERSON_ENTITY_ID: user_input[CONF_PERSON_ENTITY_ID],
         CONF_NOTIFY_TARGETS: _targets_from_text(user_input[CONF_NOTIFY_TARGETS]),
+        CONF_FALLBACK_TARGET_KEY: _normalize_target_key(
+            user_input.get(CONF_FALLBACK_TARGET_KEY, "")
+        ),
         CONF_ENABLED_TYPES: sorted(enabled_types),
         CONF_ONLY_WHEN_HOME: user_input.get(CONF_ONLY_WHEN_HOME, False),
         CONF_ALLOW_WEEKDAYS: user_input.get(CONF_ALLOW_WEEKDAYS, True),
@@ -294,7 +323,11 @@ def _profile_select_options(profiles: list[dict[str, Any]]) -> list[dict[str, st
     return [
         {
             "value": profile[CONF_PROFILE_ID],
-            "label": profile.get(CONF_NAME) or profile.get(CONF_PERSON_ENTITY_ID),
+            "label": (
+                f"{profile.get(CONF_NAME)} ({profile.get(CONF_TARGET_KEY)})"
+                if profile.get(CONF_TARGET_KEY)
+                else profile.get(CONF_NAME) or profile.get(CONF_PERSON_ENTITY_ID)
+            ),
         }
         for profile in profiles
     ]
@@ -332,3 +365,30 @@ def _optional_enabled_types(value: Any) -> list[str]:
         for item in value
         if item in OPTIONAL_NOTIFICATION_TYPES
     ]
+
+
+def _normalize_target_key(value: Any) -> str:
+    """Normalize a profile target key."""
+    return (
+        str(value or "")
+        .strip()
+        .casefold()
+        .replace(" ", "_")
+        .replace("-", "_")
+    )
+
+
+def _target_key_exists(
+    profiles: list[dict[str, Any]],
+    target_key: str,
+    current_profile_id: str | None = None,
+) -> bool:
+    """Return whether a target key is already used by another profile."""
+    if not target_key:
+        return False
+    for profile in profiles:
+        if profile.get(CONF_PROFILE_ID) == current_profile_id:
+            continue
+        if profile.get(CONF_TARGET_KEY) == target_key:
+            return True
+    return False
