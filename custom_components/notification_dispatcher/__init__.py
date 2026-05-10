@@ -28,6 +28,7 @@ from .const import (
     DOMAIN,
     NOTIFICATION_TYPES,
     SERVICE_SEND,
+    TARGET_ALL,
 )
 from .dispatcher import NotificationDispatcher
 
@@ -42,7 +43,7 @@ SERVICE_SEND_SCHEMA = vol.Schema(
             NOTIFICATION_TYPES
         ),
         vol.Optional(ATTR_TARGET_ALL): cv.boolean,
-        vol.Optional(ATTR_TARGET): vol.All(cv.ensure_list, [cv.string]),
+        vol.Optional(ATTR_TARGET, default=TARGET_ALL): cv.string,
         vol.Optional(ATTR_RECIPIENTS): vol.All(cv.ensure_list, [cv.string]),
         vol.Optional(ATTR_DATA): dict,
         vol.Optional(ATTR_DRY_RUN, default=False): cv.boolean,
