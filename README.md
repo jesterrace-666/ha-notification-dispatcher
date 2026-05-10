@@ -23,6 +23,19 @@ Die Action erwartet im Kern:
 
 ## Installation
 
+### HACS
+
+1. Oeffne HACS.
+2. Oeffne das Drei-Punkte-Menue oben rechts.
+3. Waehle **Custom repositories**.
+4. Fuege `https://github.com/jesterrace-666/ha-notification-dispatcher` hinzu.
+5. Waehle als Kategorie **Integration**.
+6. Installiere **Notification Dispatcher**.
+7. Starte Home Assistant neu.
+8. Oeffne **Einstellungen > Geraete & Dienste > Integration hinzufuegen** und suche nach **Notification Dispatcher**.
+
+### Manuell
+
 1. Kopiere `custom_components/notification_dispatcher` in den `custom_components` Ordner deiner Home-Assistant-Konfiguration.
 2. Starte Home Assistant neu.
 3. Oeffne **Einstellungen > Geraete & Dienste > Integration hinzufuegen**.
