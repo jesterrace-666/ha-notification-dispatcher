@@ -28,8 +28,8 @@ from .const import (
     CONF_DND_ENABLED,
     CONF_DND_END,
     CONF_DND_START,
+    CONF_DND_WINDOW,
     CONF_ENABLED_TYPES,
-    CONF_FALLBACK_TARGET_KEY,
     CONF_NAME,
     CONF_NOTIFY_TARGETS,
     CONF_ONLY_WHEN_HOME,
@@ -39,15 +39,18 @@ from .const import (
     CONF_TARGET_KEY,
     CONF_WEEKDAY_END,
     CONF_WEEKDAY_START,
+    CONF_WEEKDAY_WINDOW,
     CONF_WEEKEND_END,
     CONF_WEEKEND_START,
+    CONF_WEEKEND_WINDOW,
     DEFAULT_DND_END,
     DEFAULT_DND_START,
+    DEFAULT_DND_WINDOW,
     DEFAULT_NOTIFICATION_TYPE,
     DEFAULT_WEEKDAY_END,
     DEFAULT_WEEKDAY_START,
-    DEFAULT_WEEKEND_END,
-    DEFAULT_WEEKEND_START,
+    DEFAULT_WEEKDAY_WINDOW,
+    DEFAULT_WEEKEND_WINDOW,
     NOTIFICATION_TYPES,
     TARGET_ALL,
     TYPE_CRITICAL,
@@ -63,15 +66,6 @@ TYPE_ICONS = {
     TYPE_WARNING: "⚠️",
     TYPE_CRITICAL: "🔥",
     TYPE_REMINDER: "⏰",
-}
-
-FALLBACK_REASONS = {
-    "person_not_home",
-    "weekday_disabled",
-    "weekend_disabled",
-    "outside_weekday_window",
-    "outside_weekend_window",
-    "dnd_active",
 }
 
 
@@ -105,8 +99,8 @@ class NotificationDispatcher:
                 f"Unsupported notification type: {notification_type}"
             )
 
-        target_key = _target_key_from_call(call_data)
-        profiles = self._select_profiles(target_key, notification_type)
+        target_keys = _target_keys_from_call(call_data)
+        profiles = self._select_profiles(target_keys, notification_type)
         if not profiles:
             raise ServiceValidationError("No matching notification profiles configured")
 
@@ -142,35 +136,11 @@ class NotificationDispatcher:
                     {"target": "notify.persistent_notification"}
                 )
 
-        target_all = target_key == TARGET_ALL or notification_type == TYPE_CRITICAL
-
         for profile in profiles:
             decision = self._delivery_decision(profile, notification_type)
             if not decision.should_deliver:
-                fallback_profile = (
-                    None
-                    if target_all or notification_type == TYPE_CRITICAL
-                    else self._fallback_profile(profile, decision.reason)
-                )
-                if fallback_profile is not None:
-                    await self._async_send_profile(
-                        result=result,
-                        profile=fallback_profile,
-                        title=_fallback_title(title, profile),
-                        message=_fallback_message(message, profile),
-                        payload_data=_deep_merge(
-                            _default_payload_data(notification_type),
-                            extra_data,
-                        ),
-                        dry_run=dry_run,
-                        continue_on_error=continue_on_error,
-                        fallback_for=profile.get(CONF_NAME),
-                        fallback_reason=decision.reason,
-                    )
-                    continue
-
                 result["skipped"].append(
-                    {"profile": profile.get(CONF_NAME), "reason": decision.reason}
+                    {"profile": _profile_name(profile), "reason": decision.reason}
                 )
                 continue
 
@@ -192,15 +162,17 @@ class NotificationDispatcher:
         return result
 
     def _select_profiles(
-        self, target_key: str, notification_type: str
+        self, target_keys: list[str], notification_type: str
     ) -> list[dict[str, Any]]:
         """Return profiles matching the requested recipients."""
         profiles = list(self.entry.options.get(CONF_PROFILES, []))
 
-        if notification_type == TYPE_CRITICAL or target_key == TARGET_ALL:
+        if notification_type == TYPE_CRITICAL or TARGET_ALL in target_keys:
             return profiles
 
         matched: list[dict[str, Any]] = []
+        matched_keys: set[str] = set()
+        requested_keys = set(target_keys)
 
         for profile in profiles:
             keys = {
@@ -209,11 +181,21 @@ class NotificationDispatcher:
                 str(profile.get(CONF_PERSON_ENTITY_ID, "")).casefold(),
                 _profile_target_key(profile),
             }
-            if target_key in keys:
+            profile_matches = requested_keys & keys
+            if profile_matches:
                 matched.append(profile)
+                matched_keys.update(profile_matches)
 
         if not matched:
-            raise ServiceValidationError(f"Unknown notification target: {target_key}")
+            raise ServiceValidationError(
+                f"Unknown notification target: {', '.join(target_keys)}"
+            )
+
+        unknown = requested_keys - matched_keys
+        if unknown:
+            raise ServiceValidationError(
+                f"Unknown notification target: {', '.join(sorted(unknown))}"
+            )
 
         return matched
 
@@ -236,29 +218,41 @@ class NotificationDispatcher:
         is_weekday = now.weekday() < 5
 
         if is_weekday:
-            if not profile.get(CONF_ALLOW_WEEKDAYS, True):
+            weekday_window = _profile_time_window(
+                profile,
+                CONF_WEEKDAY_WINDOW,
+                CONF_ALLOW_WEEKDAYS,
+                CONF_WEEKDAY_START,
+                CONF_WEEKDAY_END,
+                DEFAULT_WEEKDAY_WINDOW,
+            )
+            if weekday_window is None:
                 return DeliveryDecision(False, "weekday_disabled")
-            if not _time_in_allowed_window(
-                now_time,
-                profile.get(CONF_WEEKDAY_START, DEFAULT_WEEKDAY_START),
-                profile.get(CONF_WEEKDAY_END, DEFAULT_WEEKDAY_END),
-            ):
+            if not _time_in_allowed_window(now_time, *weekday_window):
                 return DeliveryDecision(False, "outside_weekday_window")
         else:
-            if not profile.get(CONF_ALLOW_WEEKENDS, True):
+            weekend_window = _profile_time_window(
+                profile,
+                CONF_WEEKEND_WINDOW,
+                CONF_ALLOW_WEEKENDS,
+                CONF_WEEKEND_START,
+                CONF_WEEKEND_END,
+                DEFAULT_WEEKEND_WINDOW,
+            )
+            if weekend_window is None:
                 return DeliveryDecision(False, "weekend_disabled")
-            if not _time_in_allowed_window(
-                now_time,
-                profile.get(CONF_WEEKEND_START, DEFAULT_WEEKEND_START),
-                profile.get(CONF_WEEKEND_END, DEFAULT_WEEKEND_END),
-            ):
+            if not _time_in_allowed_window(now_time, *weekend_window):
                 return DeliveryDecision(False, "outside_weekend_window")
 
-        if profile.get(CONF_DND_ENABLED, True) and _time_in_blocked_window(
-            now_time,
-            profile.get(CONF_DND_START, DEFAULT_DND_START),
-            profile.get(CONF_DND_END, DEFAULT_DND_END),
-        ):
+        dnd_window = _profile_time_window(
+            profile,
+            CONF_DND_WINDOW,
+            CONF_DND_ENABLED,
+            CONF_DND_START,
+            CONF_DND_END,
+            DEFAULT_DND_WINDOW,
+        )
+        if dnd_window is not None and _time_in_blocked_window(now_time, *dnd_window):
             return DeliveryDecision(False, "dnd_active")
 
         return DeliveryDecision(True, "matched")
@@ -284,24 +278,6 @@ class NotificationDispatcher:
             if str(target).strip()
         ]
 
-    def _fallback_profile(
-        self, profile: dict[str, Any], reason: str
-    ) -> dict[str, Any] | None:
-        """Return a fallback profile for a skipped direct target."""
-        fallback_key = _normalize_target_key(profile.get(CONF_FALLBACK_TARGET_KEY))
-        if not fallback_key or reason not in FALLBACK_REASONS:
-            return None
-        if fallback_key == _profile_target_key(profile):
-            return None
-        return self._profile_by_target_key(fallback_key)
-
-    def _profile_by_target_key(self, target_key: str) -> dict[str, Any] | None:
-        """Return a profile by configured target key."""
-        for profile in self.entry.options.get(CONF_PROFILES, []):
-            if _profile_target_key(profile) == target_key:
-                return profile
-        return None
-
     async def _async_send_profile(
         self,
         *,
@@ -312,15 +288,13 @@ class NotificationDispatcher:
         payload_data: dict[str, Any],
         dry_run: bool,
         continue_on_error: bool,
-        fallback_for: str | None = None,
-        fallback_reason: str | None = None,
     ) -> None:
         """Send a notification to all targets of a profile."""
         targets = self._profile_targets(profile)
         if not targets:
             result["skipped"].append(
                 {
-                    "profile": profile.get(CONF_NAME),
+                    "profile": _profile_name(profile),
                     "reason": "no_notify_targets",
                 }
             )
@@ -329,13 +303,10 @@ class NotificationDispatcher:
         for target in targets:
             if dry_run:
                 sent = {
-                    "profile": profile.get(CONF_NAME),
+                    "profile": _profile_name(profile),
                     "target": target,
                     "dry_run": True,
                 }
-                if fallback_for:
-                    sent["fallback_for"] = fallback_for
-                    sent["fallback_reason"] = fallback_reason
                 result["sent"].append(sent)
                 continue
 
@@ -348,27 +319,21 @@ class NotificationDispatcher:
                 )
             except HomeAssistantError as err:
                 failed = {
-                    "profile": profile.get(CONF_NAME),
+                    "profile": _profile_name(profile),
                     "target": target,
                     "error": str(err),
                 }
-                if fallback_for:
-                    failed["fallback_for"] = fallback_for
-                    failed["fallback_reason"] = fallback_reason
                 result["failed"].append(failed)
                 if not continue_on_error:
                     raise
                 _LOGGER.warning(
                     "Failed to send notification to %s for %s: %s",
                     target,
-                    profile.get(CONF_NAME),
+                    _profile_name(profile),
                     err,
                 )
             else:
-                sent = {"profile": profile.get(CONF_NAME), "target": target}
-                if fallback_for:
-                    sent["fallback_for"] = fallback_for
-                    sent["fallback_reason"] = fallback_reason
+                sent = {"profile": _profile_name(profile), "target": target}
                 result["sent"].append(sent)
 
     async def _async_send_to_target(
@@ -432,15 +397,35 @@ def _normalize_notify_target(target: Any) -> str:
     return normalized
 
 
-def _target_key_from_call(call_data: dict[str, Any]) -> str:
-    """Return the requested target key from service data."""
+def _target_keys_from_call(call_data: dict[str, Any]) -> list[str]:
+    """Return the requested target keys from service data."""
     if call_data.get(ATTR_TARGET_ALL) is True:
-        return TARGET_ALL
+        return [TARGET_ALL]
 
-    target = _normalize_target_key(call_data.get(ATTR_TARGET) or TARGET_ALL)
-    if target in {"", TARGET_ALL}:
-        return TARGET_ALL
-    return target
+    raw_values = _ensure_list(call_data.get(ATTR_TARGET))
+    if not raw_values:
+        raw_values = _ensure_list(call_data.get(ATTR_RECIPIENTS))
+    if not raw_values:
+        return [TARGET_ALL]
+
+    target_keys: list[str] = []
+    for raw_value in raw_values:
+        target_key = _normalize_target_key(raw_value)
+        if target_key in {"", TARGET_ALL}:
+            return [TARGET_ALL]
+        if target_key not in target_keys:
+            target_keys.append(target_key)
+
+    return target_keys or [TARGET_ALL]
+
+
+def _ensure_list(value: Any) -> list[Any]:
+    """Return Home Assistant service data as a list."""
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return value
+    return [value]
 
 
 def _profile_target_key(profile: dict[str, Any]) -> str:
@@ -461,6 +446,15 @@ def _normalize_target_key(value: Any) -> str:
     )
 
 
+def _profile_name(profile: dict[str, Any]) -> str:
+    """Return the configured person name."""
+    return str(
+        profile.get(CONF_NAME)
+        or profile.get(CONF_PERSON_ENTITY_ID)
+        or "Person"
+    )
+
+
 def _format_title(notification_type: str, title: Any) -> str:
     """Prefix the title with the script-compatible type icon."""
     icon = TYPE_ICONS.get(notification_type, "🔔")
@@ -470,17 +464,42 @@ def _format_title(notification_type: str, title: Any) -> str:
     return f"{icon} {raw_title}"
 
 
-def _fallback_title(title: str, original_profile: dict[str, Any]) -> str:
-    """Return a fallback title for a delegated notification."""
-    return f"📥 [Für {original_profile.get(CONF_NAME)}] {title}"
+def _profile_time_window(
+    profile: dict[str, Any],
+    window_key: str,
+    enabled_key: str,
+    start_key: str,
+    end_key: str,
+    default_window: str,
+    *,
+    disabled_value: bool = True,
+) -> tuple[Any, Any] | None:
+    """Return a compact or legacy profile time window."""
+    if window_key in profile:
+        return _split_time_window(profile.get(window_key), default_window)
+
+    if profile.get(enabled_key, disabled_value) is False:
+        return None
+
+    start = profile.get(start_key)
+    end = profile.get(end_key)
+    if start and end:
+        return start, end
+
+    return _split_time_window(default_window, default_window)
 
 
-def _fallback_message(message: str, original_profile: dict[str, Any]) -> str:
-    """Return a fallback message for a delegated notification."""
-    return (
-        f"{original_profile.get(CONF_NAME)} ist abwesend oder Ruhezeit:\n\n"
-        f"{message}"
-    )
+def _split_time_window(value: Any, fallback: str) -> tuple[str, str] | None:
+    """Split a compact time window into start and end."""
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+
+    if "-" not in raw:
+        raw = fallback
+
+    start, end = raw.split("-", 1)
+    return start.strip(), end.strip()
 
 
 def _parse_time(value: Any, fallback: str) -> time:
