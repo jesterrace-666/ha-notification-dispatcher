@@ -10,14 +10,16 @@ Eine Custom Integration fuer Home Assistant, die Benachrichtigungen zentral an P
 - Werktage und Wochenende getrennt aktivieren und mit Zeitfenstern versehen
 - DND-Zeit pro Person konfigurieren
 - optional nur zustellen, wenn die Person zuhause ist
+- optionaler Fallback pro Person, wenn ein direkter Empfaenger gerade nicht erreichbar ist
 - kritische Nachrichten immer zustellen, unabhaengig von Zeit, DND und Anwesenheit
+- Icons vor dem Titel und persistente Home-Assistant-Benachrichtigung fuer `warning` und `critical`
 
 Die Action erwartet im Kern:
 
 1. `title`
 2. `message`
 3. `type`: `critical`, `info`, `warning` oder `reminder`
-4. `target_all` oder `target`: alle Personen oder ausgewaehlte `person.*` Entitaeten
+4. `target`: `all` oder ein in der UI konfigurierter Target-Name wie `johannes`
 
 ## Installation
 
@@ -29,6 +31,8 @@ Die Action erwartet im Kern:
 
 Als Notify-Ziel kannst du klassische Mobile-App-Actions wie `notify.mobile_app_johans_iphone` oder moderne Notify-Entitaeten wie `notify.johans_iphone` eintragen. Mehrere Ziele werden mit Komma getrennt.
 
+Jede Person bekommt einen eigenen Target-Namen, z.B. `johannes` oder `linda`. Der Name `all` ist reserviert. Wenn eine Person einen Fallback-Target-Namen bekommt, wird eine direkte Nachricht an diese Person an den Fallback geschickt, falls sie wegen Abwesenheit, Zeitfenster oder DND gerade nicht erreichbar ist.
+
 ## Action nutzen
 
 ```yaml
@@ -37,7 +41,7 @@ data:
   title: "Waschmaschine"
   message: "Die Waesche ist fertig."
   type: reminder
-  target_all: true
+  target: all
 ```
 
 Nur bestimmte Personen:
@@ -48,9 +52,7 @@ data:
   title: "Tuere"
   message: "Die Haustuer steht offen."
   type: warning
-  target_all: false
-  target:
-    - person.johan
+  target: johannes
 ```
 
 Kritisch:
@@ -61,7 +63,7 @@ data:
   title: "Alarm"
   message: "Rauchmelder im Flur ausgeloest."
   type: critical
-  target_all: true
+  target: all
 ```
 
 Zusatzdaten fuer die Mobile-App kannst du weiterreichen:
@@ -72,6 +74,7 @@ data:
   title: "Garage"
   message: "Das Garagentor ist noch offen."
   type: warning
+  target: all
   data:
     tag: garage-door
     group: security
@@ -86,7 +89,7 @@ data:
   title: "Test"
   message: "Wuerde so zugestellt werden."
   type: info
-  target_all: true
+  target: all
   dry_run: true
 ```
 
