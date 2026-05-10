@@ -30,6 +30,9 @@ from .const import (
     CONF_DND_START,
     CONF_DND_WINDOW,
     CONF_ENABLED_TYPES,
+    CONF_GROUP_ID,
+    CONF_GROUP_MEMBERS,
+    CONF_GROUPS,
     CONF_NAME,
     CONF_NOTIFY_TARGETS,
     CONF_ONLY_WHEN_HOME,
@@ -60,6 +63,7 @@ from .const import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+TARGET_ALL_ALIASES = {TARGET_ALL, "alle"}
 
 TYPE_ICONS = {
     TYPE_INFO: "ℹ️",
@@ -167,12 +171,13 @@ class NotificationDispatcher:
         """Return profiles matching the requested recipients."""
         profiles = list(self.entry.options.get(CONF_PROFILES, []))
 
-        if notification_type == TYPE_CRITICAL or TARGET_ALL in target_keys:
+        if notification_type == TYPE_CRITICAL or set(target_keys) & TARGET_ALL_ALIASES:
             return profiles
 
         matched: list[dict[str, Any]] = []
         matched_keys: set[str] = set()
         requested_keys = set(target_keys)
+        group_member_ids, matched_group_keys = self._group_member_ids(requested_keys)
 
         for profile in profiles:
             keys = {
@@ -182,22 +187,46 @@ class NotificationDispatcher:
                 _profile_target_key(profile),
             }
             profile_matches = requested_keys & keys
-            if profile_matches:
+            if profile_matches or profile.get(CONF_PROFILE_ID) in group_member_ids:
                 matched.append(profile)
                 matched_keys.update(profile_matches)
 
         if not matched:
+            if matched_group_keys:
+                raise ServiceValidationError(
+                    f"Notification group has no configured people: "
+                    f"{', '.join(sorted(matched_group_keys))}"
+                )
             raise ServiceValidationError(
                 f"Unknown notification target: {', '.join(target_keys)}"
             )
 
-        unknown = requested_keys - matched_keys
+        unknown = requested_keys - matched_keys - matched_group_keys
         if unknown:
             raise ServiceValidationError(
                 f"Unknown notification target: {', '.join(sorted(unknown))}"
             )
 
         return matched
+
+    def _group_member_ids(self, requested_keys: set[str]) -> tuple[set[str], set[str]]:
+        """Return profile ids selected by matching groups."""
+        member_ids: set[str] = set()
+        matched_group_keys: set[str] = set()
+
+        for group in self.entry.options.get(CONF_GROUPS, []):
+            group_keys = _group_target_keys(group)
+            matches = requested_keys & group_keys
+            if not matches:
+                continue
+            matched_group_keys.update(matches)
+            member_ids.update(
+                str(member_id)
+                for member_id in _ensure_list(group.get(CONF_GROUP_MEMBERS))
+                if str(member_id)
+            )
+
+        return member_ids, matched_group_keys
 
     def _delivery_decision(
         self, profile: dict[str, Any], notification_type: str
@@ -411,7 +440,7 @@ def _target_keys_from_call(call_data: dict[str, Any]) -> list[str]:
     target_keys: list[str] = []
     for raw_value in raw_values:
         target_key = _normalize_target_key(raw_value)
-        if target_key in {"", TARGET_ALL}:
+        if target_key in {"", *TARGET_ALL_ALIASES}:
             return [TARGET_ALL]
         if target_key not in target_keys:
             target_keys.append(target_key)
@@ -433,6 +462,19 @@ def _profile_target_key(profile: dict[str, Any]) -> str:
     return _normalize_target_key(
         profile.get(CONF_TARGET_KEY) or profile.get(CONF_NAME)
     )
+
+
+def _group_target_keys(group: dict[str, Any]) -> set[str]:
+    """Return all keys that can select a configured group."""
+    return {
+        key
+        for key in {
+            str(group.get(CONF_GROUP_ID, "")).casefold(),
+            _normalize_target_key(group.get(CONF_NAME)),
+            _normalize_target_key(group.get(CONF_TARGET_KEY)),
+        }
+        if key
+    }
 
 
 def _normalize_target_key(value: Any) -> str:
