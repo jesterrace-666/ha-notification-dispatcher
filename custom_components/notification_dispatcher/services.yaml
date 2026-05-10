@@ -35,24 +35,19 @@ send:
             - warning
             - info
             - reminder
-    target_all:
-      name: All
-      description: Send to all configured people.
-      required: false
-      default: true
-      selector:
-        boolean:
     target:
       name: Target
-      description: People to notify when All is disabled.
+      description: Configured recipient key, for example johannes, linda, or all.
       required: false
+      default: all
       selector:
-        entity:
-          domain: person
-          multiple: true
+        select:
+          custom_value: true
+          options:
+            - all
     recipients:
       name: Recipients
-      description: Legacy field for profile names, person entity IDs, or profile IDs. Prefer Target.
+      description: Legacy field. Prefer Target.
       required: false
       advanced: true
       selector:
