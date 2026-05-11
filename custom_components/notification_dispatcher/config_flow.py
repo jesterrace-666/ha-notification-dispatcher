@@ -119,12 +119,18 @@ class NotificationDispatcherOptionsFlow(config_entries.OptionsFlowWithReload):
                 _LOGGER.exception("Unable to save notification dispatcher person")
                 errors["base"] = "save_failed"
             else:
-                errors = _profile_errors(self._profiles, profile)
-                if not errors:
-                    profiles = [*self._profiles, profile]
-                    return self.async_create_entry(
-                        data=self._updated_options(profiles=profiles)
+                try:
+                    errors = _profile_errors(self._profiles, profile)
+                    if not errors:
+                        profiles = [*self._profiles, profile]
+                        return self.async_create_entry(
+                            data=self._updated_options(profiles=profiles)
+                        )
+                except Exception:
+                    _LOGGER.exception(
+                        "Unable to finalize notification dispatcher person save"
                     )
+                    errors["base"] = "save_failed"
 
         return self.async_show_form(
             step_id="add_person",
@@ -169,21 +175,28 @@ class NotificationDispatcherOptionsFlow(config_entries.OptionsFlowWithReload):
                 _LOGGER.exception("Unable to update notification dispatcher person")
                 errors["base"] = "save_failed"
             else:
-                errors = _profile_errors(
-                    self._profiles,
-                    updated_profile,
-                    updated_profile[CONF_PROFILE_ID],
-                )
-                if not errors:
-                    profiles = [
-                        updated_profile
-                        if item.get(CONF_PROFILE_ID) == updated_profile[CONF_PROFILE_ID]
-                        else item
-                        for item in self._profiles
-                    ]
-                    return self.async_create_entry(
-                        data=self._updated_options(profiles=profiles)
+                try:
+                    errors = _profile_errors(
+                        self._profiles,
+                        updated_profile,
+                        updated_profile[CONF_PROFILE_ID],
                     )
+                    if not errors:
+                        profiles = [
+                            updated_profile
+                            if item.get(CONF_PROFILE_ID)
+                            == updated_profile[CONF_PROFILE_ID]
+                            else item
+                            for item in self._profiles
+                        ]
+                        return self.async_create_entry(
+                            data=self._updated_options(profiles=profiles)
+                        )
+                except Exception:
+                    _LOGGER.exception(
+                        "Unable to finalize notification dispatcher person update"
+                    )
+                    errors["base"] = "save_failed"
 
         return self.async_show_form(
             step_id="edit_details",
@@ -200,10 +213,7 @@ class NotificationDispatcherOptionsFlow(config_entries.OptionsFlowWithReload):
                 for profile in self._profiles
                 if profile.get(CONF_PROFILE_ID) != profile_id
             ]
-            groups = [
-                _group_without_member(group, profile_id)
-                for group in self._groups
-            ]
+            groups = [_group_without_member(group, profile_id) for group in self._groups]
             return self.async_create_entry(
                 data=self._updated_options(profiles=profiles, groups=groups)
             )
@@ -230,9 +240,7 @@ class NotificationDispatcherOptionsFlow(config_entries.OptionsFlowWithReload):
             errors = _group_errors(self._groups, group)
             if not errors:
                 groups = [*self._groups, group]
-                return self.async_create_entry(
-                    data=self._updated_options(groups=groups)
-                )
+                return self.async_create_entry(data=self._updated_options(groups=groups))
 
         return self.async_show_form(
             step_id="add_group",
@@ -280,9 +288,7 @@ class NotificationDispatcherOptionsFlow(config_entries.OptionsFlowWithReload):
                     else item
                     for item in self._groups
                 ]
-                return self.async_create_entry(
-                    data=self._updated_options(groups=groups)
-                )
+                return self.async_create_entry(data=self._updated_options(groups=groups))
 
         return self.async_show_form(
             step_id="edit_group_details",
@@ -295,13 +301,9 @@ class NotificationDispatcherOptionsFlow(config_entries.OptionsFlowWithReload):
         if user_input is not None:
             group_id = user_input[CONF_GROUP_ID]
             groups = [
-                group
-                for group in self._groups
-                if group.get(CONF_GROUP_ID) != group_id
+                group for group in self._groups if group.get(CONF_GROUP_ID) != group_id
             ]
-            return self.async_create_entry(
-                data=self._updated_options(groups=groups)
-            )
+            return self.async_create_entry(data=self._updated_options(groups=groups))
 
         return self.async_show_form(
             step_id="remove_group",
@@ -317,12 +319,12 @@ class NotificationDispatcherOptionsFlow(config_entries.OptionsFlowWithReload):
     @property
     def _profiles(self) -> list[dict[str, Any]]:
         """Return configured profiles."""
-        return list(self.config_entry.options.get(CONF_PROFILES, []))
+        return _coerce_mapping_list(self.config_entry.options.get(CONF_PROFILES, []))
 
     @property
     def _groups(self) -> list[dict[str, Any]]:
         """Return configured notification groups."""
-        return list(self.config_entry.options.get(CONF_GROUPS, []))
+        return _coerce_mapping_list(self.config_entry.options.get(CONF_GROUPS, []))
 
     @property
     def _selected_profile(self) -> dict[str, Any] | None:
@@ -444,10 +446,12 @@ def _profile_from_user_input(
 ) -> dict[str, Any]:
     """Create a stored profile from form input."""
     existing = existing or {}
-    enabled_types = set(_ensure_list(user_input.get(CONF_ENABLED_TYPES)))
+    enabled_types = set(_optional_enabled_types(user_input.get(CONF_ENABLED_TYPES)))
     enabled_types.add(TYPE_CRITICAL)
 
-    person_entity_id = str(user_input.get(CONF_PERSON_ENTITY_ID, "")).strip()
+    person_entity_id = _selector_value_to_string(
+        user_input.get(CONF_PERSON_ENTITY_ID, "")
+    ).strip()
     known_targets = _known_notify_targets(hass)
 
     target_key = (
@@ -729,6 +733,7 @@ def _notify_target_label(hass: HomeAssistant, target: str) -> str:
     label = name.replace("_", " ").title()
     return f"{label} ({target})"
 
+
 def _targets_from_input(value: Any, known_targets: set[str]) -> list[str]:
     """Parse selector values into normalized notify targets."""
     if isinstance(value, str):
@@ -740,7 +745,10 @@ def _targets_from_input(value: Any, known_targets: set[str]) -> list[str]:
 
     targets: list[str] = []
     for raw_target in raw_targets:
-        target = _normalize_notify_target(raw_target, known_targets)
+        target = _normalize_notify_target(
+            _selector_value_to_string(raw_target),
+            known_targets,
+        )
         if target and target not in targets:
             targets.append(target)
     return targets
@@ -779,15 +787,22 @@ def _targets_to_list(value: Any) -> list[str]:
     if isinstance(value, str):
         return [target.strip() for target in value.split(",") if target.strip()]
     if isinstance(value, list):
-        return [str(item).strip() for item in value if str(item).strip()]
+        return [
+            _selector_value_to_string(item).strip()
+            for item in value
+            if _selector_value_to_string(item).strip()
+        ]
     return []
 
 
 def _optional_enabled_types(value: Any) -> list[str]:
     """Return non-critical enabled notification types."""
-    if isinstance(value, str):
-        value = [value]
-    return [item for item in value if item in OPTIONAL_NOTIFICATION_TYPES]
+    optional_types: list[str] = []
+    for raw_item in _ensure_list(value):
+        item = _selector_value_to_string(raw_item).strip().lower()
+        if item in OPTIONAL_NOTIFICATION_TYPES and item not in optional_types:
+            optional_types.append(item)
+    return optional_types
 
 
 def _window_from_profile(
@@ -863,7 +878,35 @@ def _ensure_list(value: Any) -> list[Any]:
         return []
     if isinstance(value, list):
         return value
+    if isinstance(value, tuple):
+        return list(value)
     return [value]
+
+
+def _selector_value_to_string(value: Any) -> str:
+    """Convert selector values to a plain string."""
+    if isinstance(value, dict):
+        for key in ("value", "entity_id", "id"):
+            raw = value.get(key)
+            if raw:
+                return str(raw)
+    return str(value or "")
+
+
+def _coerce_mapping_list(value: Any) -> list[dict[str, Any]]:
+    """Return a list of dict entries from potentially old options formats."""
+    if isinstance(value, dict):
+        raw_items: list[Any] = list(value.values())
+    elif isinstance(value, list):
+        raw_items = value
+    else:
+        raw_items = []
+
+    items: list[dict[str, Any]] = []
+    for item in raw_items:
+        if isinstance(item, dict):
+            items.append(item)
+    return items
 
 
 def _normalize_target_key(value: Any) -> str:
