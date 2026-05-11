@@ -203,8 +203,9 @@ class NotificationDispatcher:
 
         unknown = requested_keys - matched_keys - matched_group_keys
         if unknown:
-            raise ServiceValidationError(
-                f"Unknown notification target: {', '.join(sorted(unknown))}"
+            _LOGGER.warning(
+                "Skipping unknown notification targets: %s",
+                ", ".join(sorted(unknown)),
             )
 
         return matched
@@ -439,7 +440,7 @@ def _target_keys_from_call(call_data: dict[str, Any]) -> list[str]:
 
     target_keys: list[str] = []
     for raw_value in raw_values:
-        target_key = _normalize_target_key(raw_value)
+        target_key = _normalize_target_key(_extract_target_value(raw_value))
         if target_key in {"", *TARGET_ALL_ALIASES}:
             return [TARGET_ALL]
         if target_key not in target_keys:
@@ -455,6 +456,21 @@ def _ensure_list(value: Any) -> list[Any]:
     if isinstance(value, list):
         return value
     return [value]
+
+
+def _extract_target_value(value: Any) -> Any:
+    """Extract the underlying value from selector-like dictionaries."""
+    if not isinstance(value, dict):
+        return value
+    if "entity_id" in value:
+        entity_value = value["entity_id"]
+        if isinstance(entity_value, list):
+            return entity_value[0] if entity_value else ""
+        return entity_value
+    for key in ("value", "id"):
+        if key in value:
+            return value[key]
+    return value
 
 
 def _profile_target_key(profile: dict[str, Any]) -> str:
