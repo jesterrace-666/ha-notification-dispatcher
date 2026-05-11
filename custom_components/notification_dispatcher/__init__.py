@@ -51,7 +51,8 @@ SERVICE_SEND_SCHEMA = vol.Schema(
         vol.Optional(ATTR_DATA): vol.Any(None, dict),
         vol.Optional(ATTR_DRY_RUN, default=False): cv.boolean,
         vol.Optional(ATTR_CONTINUE_ON_ERROR, default=True): cv.boolean,
-    }
+    },
+    extra=vol.ALLOW_EXTRA,
 )
 
 
