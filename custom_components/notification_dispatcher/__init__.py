@@ -48,7 +48,7 @@ SERVICE_SEND_SCHEMA = vol.Schema(
             vol.All(cv.ensure_list, [cv.string]),
         ),
         vol.Optional(ATTR_RECIPIENTS): vol.All(cv.ensure_list, [cv.string]),
-        vol.Optional(ATTR_DATA): dict,
+        vol.Optional(ATTR_DATA): vol.Any(None, dict),
         vol.Optional(ATTR_DRY_RUN, default=False): cv.boolean,
         vol.Optional(ATTR_CONTINUE_ON_ERROR, default=True): cv.boolean,
     }
