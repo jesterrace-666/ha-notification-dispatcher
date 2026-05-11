@@ -2,14 +2,6 @@ send:
   name: Send notification
   description: Dispatch a notification to configured people according to their rules.
   fields:
-    config_entry_id:
-      name: Config entry
-      description: Optional dispatcher configuration to use.
-      required: false
-      advanced: true
-      selector:
-        config_entry:
-          integration: notification_dispatcher
     title:
       name: Title
       description: Notification title.
@@ -36,26 +28,14 @@ send:
             - info
             - reminder
     target:
-      name: Targets
-      description: Built-in all/alle target, a person entity, a person name, or a configured dispatcher group. Leave empty to notify all configured people.
-      required: false
-      selector:
-        select:
-          custom_value: true
-          multiple: true
-          options:
-            - all
-            - alle
-    recipients:
       name: Recipients
-      description: Legacy field for old automations. Prefer Targets.
+      description: Select one or more Home Assistant people. Leave empty to notify all configured people.
       required: false
-      advanced: true
       selector:
-        select:
-          custom_value: true
+        entity:
           multiple: true
-          options: []
+          filter:
+            - domain: person
     data:
       name: Data
       description: Optional raw data passed through to the notify action.
@@ -63,19 +43,3 @@ send:
       advanced: true
       selector:
         object:
-    dry_run:
-      name: Dry run
-      description: Evaluate recipients without sending notifications.
-      required: false
-      default: false
-      advanced: true
-      selector:
-        boolean:
-    continue_on_error:
-      name: Continue on error
-      description: Continue sending to other targets if one notify target fails.
-      required: false
-      default: true
-      advanced: true
-      selector:
-        boolean:
