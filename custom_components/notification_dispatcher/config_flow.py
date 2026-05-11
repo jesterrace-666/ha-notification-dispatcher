@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from typing import Any
 from uuid import uuid4
@@ -54,6 +55,7 @@ from .const import (
 
 _WINDOW_SPLITTER = re.compile(r"\s*(?:-|\bbis\b|\bto\b)\s*", re.IGNORECASE)
 TARGET_ALL_ALIASES = {"all", "alle"}
+_LOGGER = logging.getLogger(__name__)
 
 
 class InvalidTimeWindow(ValueError):
@@ -113,6 +115,9 @@ class NotificationDispatcherOptionsFlow(config_entries.OptionsFlowWithReload):
                 profile = _profile_from_user_input(self.hass, user_input)
             except InvalidTimeWindow as err:
                 errors[err.field] = "invalid_time_window"
+            except Exception:
+                _LOGGER.exception("Unable to save notification dispatcher person")
+                errors["base"] = "save_failed"
             else:
                 errors = _profile_errors(self._profiles, profile)
                 if not errors:
@@ -160,6 +165,9 @@ class NotificationDispatcherOptionsFlow(config_entries.OptionsFlowWithReload):
                 )
             except InvalidTimeWindow as err:
                 errors[err.field] = "invalid_time_window"
+            except Exception:
+                _LOGGER.exception("Unable to update notification dispatcher person")
+                errors["base"] = "save_failed"
             else:
                 errors = _profile_errors(
                     self._profiles,
@@ -355,6 +363,19 @@ def _profile_schema(
 ) -> vol.Schema:
     """Build the person profile schema."""
     profile = profile or {}
+    notify_target_options = _notify_target_select_options(hass)
+    if notify_target_options:
+        notify_target_selector = SelectSelector(
+            SelectSelectorConfig(
+                options=notify_target_options,
+                multiple=True,
+                custom_value=True,
+            )
+        )
+        notify_target_default = _targets_to_list(profile.get(CONF_NOTIFY_TARGETS, []))
+    else:
+        notify_target_selector = TextSelector()
+        notify_target_default = _targets_to_text(profile.get(CONF_NOTIFY_TARGETS, []))
 
     return vol.Schema(
         {
@@ -364,8 +385,8 @@ def _profile_schema(
             ): EntitySelector(EntitySelectorConfig(domain="person")),
             vol.Required(
                 CONF_NOTIFY_TARGETS,
-                default=_targets_to_text(profile.get(CONF_NOTIFY_TARGETS, [])),
-            ): TextSelector(),
+                default=notify_target_default,
+            ): notify_target_selector,
             vol.Optional(
                 CONF_ENABLED_TYPES,
                 default=_optional_enabled_types(profile.get(CONF_ENABLED_TYPES, [])),
@@ -423,7 +444,7 @@ def _profile_from_user_input(
 ) -> dict[str, Any]:
     """Create a stored profile from form input."""
     existing = existing or {}
-    enabled_types = set(user_input.get(CONF_ENABLED_TYPES, []))
+    enabled_types = set(_ensure_list(user_input.get(CONF_ENABLED_TYPES)))
     enabled_types.add(TYPE_CRITICAL)
 
     person_entity_id = str(user_input.get(CONF_PERSON_ENTITY_ID, "")).strip()
@@ -651,17 +672,62 @@ def _known_notify_targets(hass: HomeAssistant) -> set[str]:
     """Return notify services and notify entities that can be offered in the UI."""
     targets: set[str] = set()
 
-    notify_services = hass.services.async_services().get("notify", {})
-    for service in notify_services:
+    for service in _notify_services(hass):
         if service in {"persistent_notification", "send_message"}:
             continue
         targets.add(f"notify.{service}")
 
-    for entity_id in hass.states.async_entity_ids("notify"):
-        targets.add(entity_id)
+    try:
+        targets.update(hass.states.async_entity_ids("notify"))
+    except Exception:
+        _LOGGER.exception("Unable to list notify entities for options flow")
 
     return targets
 
+
+def _notify_services(hass: HomeAssistant) -> list[str]:
+    """Return notify service names without failing the options flow."""
+    try:
+        return list(hass.services.async_services_for_domain("notify"))
+    except AttributeError:
+        try:
+            return list(hass.services.async_services().get("notify", {}))
+        except Exception:
+            _LOGGER.exception("Unable to list notify services for options flow")
+            return []
+    except Exception:
+        _LOGGER.exception("Unable to list notify services for options flow")
+        return []
+
+
+def _notify_target_select_options(hass: HomeAssistant) -> list[dict[str, str]]:
+    """Build select options for available notify targets."""
+    targets = sorted(
+        _known_notify_targets(hass),
+        key=lambda target: _notify_target_label(hass, target).casefold(),
+    )
+    return [
+        {
+            "value": target,
+            "label": _notify_target_label(hass, target),
+        }
+        for target in targets
+    ]
+
+
+def _notify_target_label(hass: HomeAssistant, target: str) -> str:
+    """Return a readable label for a notify target."""
+    state = hass.states.get(target)
+    if state is not None:
+        friendly_name = state.attributes.get("friendly_name")
+        if friendly_name:
+            return f"{friendly_name} ({target})"
+
+    name = target.removeprefix("notify.")
+    if name.startswith("mobile_app_"):
+        name = name.removeprefix("mobile_app_")
+    label = name.replace("_", " ").title()
+    return f"{label} ({target})"
 
 def _targets_from_input(value: Any, known_targets: set[str]) -> list[str]:
     """Parse selector values into normalized notify targets."""
@@ -706,6 +772,15 @@ def _targets_to_text(value: Any) -> str:
     if isinstance(value, list):
         return ", ".join(str(item) for item in value if str(item).strip())
     return ""
+
+
+def _targets_to_list(value: Any) -> list[str]:
+    """Render notify targets for a multi-select field."""
+    if isinstance(value, str):
+        return [target.strip() for target in value.split(",") if target.strip()]
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
+    return []
 
 
 def _optional_enabled_types(value: Any) -> list[str]:

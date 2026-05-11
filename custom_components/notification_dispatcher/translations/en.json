@@ -26,7 +26,7 @@
       },
       "add_person": {
         "title": "Add person",
-        "description": "Choose a Home Assistant person and enter the mobile app targets, for example notify.mobile_app_jmi_iphone. Separate multiple targets with commas. The all/alle target is built in and cannot be deleted.",
+        "description": "Choose a Home Assistant person and then select one or more existing notify targets. If a target is not listed, you can still enter it manually. The all/alle target is built in and cannot be deleted.",
         "data": {
           "person_entity_id": "Person",
           "notify_targets": "Mobile app targets",
@@ -45,7 +45,7 @@
       },
       "edit_details": {
         "title": "Edit person",
-        "description": "Choose a Home Assistant person and enter the mobile app targets, for example notify.mobile_app_jmi_iphone. Separate multiple targets with commas. The all/alle target is built in and cannot be deleted.",
+        "description": "Choose a Home Assistant person and then select one or more existing notify targets. If a target is not listed, you can still enter it manually. The all/alle target is built in and cannot be deleted.",
         "data": {
           "person_entity_id": "Person",
           "notify_targets": "Mobile app targets",
@@ -99,7 +99,8 @@
       "missing_group_name": "Enter a group name.",
       "missing_group_members": "Choose at least one person for the group.",
       "duplicate_group": "This group already exists.",
-      "reserved_group_name": "all/alle is built in and cannot be used as a group name."
+      "reserved_group_name": "all/alle is built in and cannot be used as a group name.",
+      "save_failed": "The person could not be saved. Details are available in the Home Assistant log."
     }
   }
 }

@@ -26,7 +26,7 @@
       },
       "add_person": {
         "title": "Person hinzufuegen",
-        "description": "Waehle eine Home-Assistant-Person und trage die Mobile-App-Ziele ein, zum Beispiel notify.mobile_app_jmi_iphone. Mehrere Ziele mit Komma trennen. Das Ziel alle/all ist fest eingebaut und nicht loeschbar.",
+        "description": "Waehle eine Home-Assistant-Person und danach ein oder mehrere vorhandene Notify-Ziele aus. Falls ein Ziel nicht in der Liste steht, kannst du es weiterhin manuell eintragen. Das Ziel alle/all ist fest eingebaut und nicht loeschbar.",
         "data": {
           "person_entity_id": "Person",
           "notify_targets": "Mobile-App-Ziele",
@@ -45,7 +45,7 @@
       },
       "edit_details": {
         "title": "Person bearbeiten",
-        "description": "Waehle eine Home-Assistant-Person und trage die Mobile-App-Ziele ein, zum Beispiel notify.mobile_app_jmi_iphone. Mehrere Ziele mit Komma trennen. Das Ziel alle/all ist fest eingebaut und nicht loeschbar.",
+        "description": "Waehle eine Home-Assistant-Person und danach ein oder mehrere vorhandene Notify-Ziele aus. Falls ein Ziel nicht in der Liste steht, kannst du es weiterhin manuell eintragen. Das Ziel alle/all ist fest eingebaut und nicht loeschbar.",
         "data": {
           "person_entity_id": "Person",
           "notify_targets": "Mobile-App-Ziele",
@@ -99,7 +99,8 @@
       "missing_group_name": "Gib einen Gruppennamen ein.",
       "missing_group_members": "Waehle mindestens eine Person fuer die Gruppe aus.",
       "duplicate_group": "Diese Gruppe gibt es bereits.",
-      "reserved_group_name": "alle/all ist fest eingebaut und kann nicht als Gruppe verwendet werden."
+      "reserved_group_name": "alle/all ist fest eingebaut und kann nicht als Gruppe verwendet werden.",
+      "save_failed": "Die Person konnte nicht gespeichert werden. Details stehen im Home-Assistant-Log."
     }
   }
 }

@@ -235,7 +235,7 @@ class NotificationDispatcher:
         if notification_type == TYPE_CRITICAL:
             return DeliveryDecision(True, "critical")
 
-        enabled_types = set(profile.get(CONF_ENABLED_TYPES, []))
+        enabled_types = set(_ensure_list(profile.get(CONF_ENABLED_TYPES)))
         if notification_type not in enabled_types:
             return DeliveryDecision(False, "type_not_enabled")
 
