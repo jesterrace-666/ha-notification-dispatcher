@@ -29,17 +29,10 @@ send:
             - reminder
     target:
       name: Recipients
-      description: Select one or more Home Assistant people. Leave empty to notify all configured people.
+      description: Select one or more Home Assistant people. Only people configured in the dispatcher will receive notifications. Leave empty to notify all configured people.
       required: false
       selector:
         entity:
           multiple: true
           filter:
             - domain: person
-    data:
-      name: Data
-      description: Optional raw data passed through to the notify action.
-      required: false
-      advanced: true
-      selector:
-        object:
