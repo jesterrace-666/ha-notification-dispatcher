@@ -18,16 +18,14 @@ jobs:
       - name: Create or update release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v0.2.1
-          name: v0.2.1
+          tag_name: v0.3.0
+          name: v0.3.0
           target_commitish: main
           make_latest: true
           body: |
-            Notification Dispatcher v0.2.1
+            Notification Dispatcher v0.3.0
 
-            - Removes the custom instance name prompt during setup.
-            - Normalizes existing config entry titles to Notification Dispatcher.
-            - Simplifies person configuration to HA person + mobile app targets.
-            - Replaces separate time widgets with compact windows like 08:00-22:00.
-            - Removes fallback target configuration.
-            - Allows the send action to target one or more person entities.
+            - Fixes the person form when no mobile app target selector options are available.
+            - Shows mobile app targets as a reliable text field with comma-separated values.
+            - Adds built-in all/alle target aliases.
+            - Adds configurable notification groups.
