@@ -5,7 +5,7 @@ Eine Custom Integration fuer Home Assistant, die Benachrichtigungen zentral an P
 ## Was sie kann
 
 - Personenprofile in der Home-Assistant-UI verwalten
-- pro Person eine `person.*` Entitaet und eine oder mehrere `notify.*` Mobile-App-Ziele hinterlegen
+- pro Person eine `person.*` Entitaet und eine oder mehrere vorhandene `notify.*` Ziele auswaehlen
 - fest eingebautes Ziel `all`/`alle`, das alle konfigurierten Personen auswaehlt
 - eigene Gruppen aus Personen anlegen, z.B. `familie`
 - Zustellung nach Typ steuern: `critical`, `warning`, `info`, `reminder`
@@ -43,7 +43,7 @@ Die Action erwartet im Kern:
 4. Suche nach **Notification Dispatcher**.
 5. Oeffne danach die Optionen der Integration und fuege Personen hinzu.
 
-Beim Hinzufuegen einer Person waehlst du direkt die vorhandene `person.*` Entitaet aus Home Assistant aus. Danach hinterlegst du ein oder mehrere Mobile-App-Ziele als Text, zum Beispiel `notify.mobile_app_jmi_iphone`. Mehrere Ziele trennst du mit Komma.
+Beim Hinzufuegen einer Person waehlst du direkt die vorhandene `person.*` Entitaet aus Home Assistant aus. Danach waehlst du ein oder mehrere vorhandene Notify-Ziele aus, zum Beispiel `notify.mobile_app_jmi_iphone`. Falls Home Assistant kein Ziel melden kann oder ein Ziel fehlt, bleibt eine manuelle Eingabe moeglich.
 
 Zeitfenster werden kompakt eingetragen:
 
