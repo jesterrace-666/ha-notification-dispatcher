@@ -37,10 +37,7 @@ jobs:
                   return
               start = text.index(start_marker)
               end = text.index(end_marker, start)
-              file_path.write_text(
-                  text[:start] + new + text[end:],
-                  encoding="utf-8",
-              )
+              file_path.write_text(text[:start] + new + text[end:], encoding="utf-8")
 
           config_flow = "custom_components/notification_dispatcher/config_flow.py"
           replace(config_flow, "import re\n", "import logging\nimport re\n")
@@ -109,70 +106,74 @@ jobs:
               '    enabled_types = set(user_input.get(CONF_ENABLED_TYPES, []))\n',
               '    enabled_types = set(_ensure_list(user_input.get(CONF_ENABLED_TYPES)))\n',
           )
+
+          notify_block = "\n".join([
+              'def _known_notify_targets(hass: HomeAssistant) -> set[str]:',
+              '    """Return notify services and notify entities that can be offered in the UI."""',
+              '    targets: set[str] = set()',
+              '',
+              '    for service in _notify_services(hass):',
+              '        if service in {"persistent_notification", "send_message"}:',
+              '            continue',
+              '        targets.add(f"notify.{service}")',
+              '',
+              '    try:',
+              '        targets.update(hass.states.async_entity_ids("notify"))',
+              '    except Exception:',
+              '        _LOGGER.exception("Unable to list notify entities for options flow")',
+              '',
+              '    return targets',
+              '',
+              '',
+              'def _notify_services(hass: HomeAssistant) -> list[str]:',
+              '    """Return notify service names without failing the options flow."""',
+              '    try:',
+              '        return list(hass.services.async_services_for_domain("notify"))',
+              '    except AttributeError:',
+              '        try:',
+              '            return list(hass.services.async_services().get("notify", {}))',
+              '        except Exception:',
+              '            _LOGGER.exception("Unable to list notify services for options flow")',
+              '            return []',
+              '    except Exception:',
+              '        _LOGGER.exception("Unable to list notify services for options flow")',
+              '        return []',
+              '',
+              '',
+              'def _notify_target_select_options(hass: HomeAssistant) -> list[dict[str, str]]:',
+              '    """Build select options for available notify targets."""',
+              '    targets = sorted(',
+              '        _known_notify_targets(hass),',
+              '        key=lambda target: _notify_target_label(hass, target).casefold(),',
+              '    )',
+              '    return [',
+              '        {',
+              '            "value": target,',
+              '            "label": _notify_target_label(hass, target),',
+              '        }',
+              '        for target in targets',
+              '    ]',
+              '',
+              '',
+              'def _notify_target_label(hass: HomeAssistant, target: str) -> str:',
+              '    """Return a readable label for a notify target."""',
+              '    state = hass.states.get(target)',
+              '    if state is not None:',
+              '        friendly_name = state.attributes.get("friendly_name")',
+              '        if friendly_name:',
+              '            return f"{friendly_name} ({target})"',
+              '',
+              '    name = target.removeprefix("notify.")',
+              '    if name.startswith("mobile_app_"):',
+              '        name = name.removeprefix("mobile_app_")',
+              '    label = name.replace("_", " ").title()',
+              '    return f"{label} ({target})"',
+          ])
           replace_between(
               config_flow,
               "def _known_notify_targets",
               "\n\ndef _targets_from_input",
-              '''def _known_notify_targets(hass: HomeAssistant) -> set[str]:
-    """Return notify services and notify entities that can be offered in the UI."""
-    targets: set[str] = set()
-
-    for service in _notify_services(hass):
-        if service in {"persistent_notification", "send_message"}:
-            continue
-        targets.add(f"notify.{service}")
-
-    try:
-        targets.update(hass.states.async_entity_ids("notify"))
-    except Exception:
-        _LOGGER.exception("Unable to list notify entities for options flow")
-
-    return targets
-
-
-def _notify_services(hass: HomeAssistant) -> list[str]:
-    """Return notify service names without failing the options flow."""
-    try:
-        return list(hass.services.async_services_for_domain("notify"))
-    except AttributeError:
-        try:
-            return list(hass.services.async_services().get("notify", {}))
-        except Exception:
-            _LOGGER.exception("Unable to list notify services for options flow")
-            return []
-    except Exception:
-        _LOGGER.exception("Unable to list notify services for options flow")
-        return []
-
-
-def _notify_target_select_options(hass: HomeAssistant) -> list[dict[str, str]]:
-    """Build select options for available notify targets."""
-    targets = sorted(
-        _known_notify_targets(hass),
-        key=lambda target: _notify_target_label(hass, target).casefold(),
-    )
-    return [
-        {
-            "value": target,
-            "label": _notify_target_label(hass, target),
-        }
-        for target in targets
-    ]
-
-
-def _notify_target_label(hass: HomeAssistant, target: str) -> str:
-    """Return a readable label for a notify target."""
-    state = hass.states.get(target)
-    if state is not None:
-        friendly_name = state.attributes.get("friendly_name")
-        if friendly_name:
-            return f"{friendly_name} ({target})"
-
-    name = target.removeprefix("notify.")
-    if name.startswith("mobile_app_"):
-        name = name.removeprefix("mobile_app_")
-    label = name.replace("_", " ").title()
-    return f"{label} ({target})"''',
+              notify_block,
           )
           replace(
               config_flow,
@@ -197,6 +198,7 @@ def _notify_target_label(hass: HomeAssistant, target: str) -> str:
               '"version": "0.3.0"',
               '"version": "0.3.1"',
           )
+
           for path in [
               "custom_components/notification_dispatcher/translations/de.json",
               "custom_components/notification_dispatcher/translations/en.json",
@@ -221,6 +223,7 @@ def _notify_target_label(hass: HomeAssistant, target: str) -> str:
                   '      "save_failed": "The person could not be saved. Details are available in the Home Assistant log."',
               )
               Path(path).write_text(text, encoding="utf-8")
+
           replace(
               "README.md",
               "pro Person eine `person.*` Entitaet und eine oder mehrere `notify.*` Mobile-App-Ziele hinterlegen",
