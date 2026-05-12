@@ -27,9 +27,16 @@ send:
             - warning
             - info
             - reminder
+    target_all:
+      name: Send to all recipients
+      description: Send to all configured dispatcher people. For critical notifications this is always applied.
+      required: false
+      default: false
+      selector:
+        boolean:
     target:
       name: Recipients
-      description: Select one or more Home Assistant people. Only people configured in the dispatcher will receive notifications. Leave empty to notify all configured people.
+      description: Select one or more Home Assistant people. Only people configured in the dispatcher will receive notifications.
       required: false
       selector:
         entity:
