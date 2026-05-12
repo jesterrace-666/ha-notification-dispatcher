@@ -30,7 +30,7 @@ send:
     target_all:
       name: Send to all recipients
       description: Send to all configured dispatcher people. For critical notifications this is always applied.
-      required: false
+      required: true
       default: false
       selector:
         boolean:
