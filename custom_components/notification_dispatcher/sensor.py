@@ -98,6 +98,7 @@ class DispatcherRecipientSensor(SensorEntity):
     _attr_icon = "mdi:account-arrow-right-outline"
     _attr_native_value = "configured"
     _attr_has_entity_name = True
+    _attr_entity_registry_visible_default = False
 
     def __init__(
         self,

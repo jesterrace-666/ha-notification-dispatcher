@@ -74,6 +74,10 @@ TYPE_ICONS = {
     TYPE_REMINDER: "⏰",
 }
 
+SCOPE_ICON_ALL = "🌐"
+SCOPE_ICON_GROUP = "👥"
+SCOPE_ICON_PERSONAL = "👤"
+
 
 @dataclass(frozen=True)
 class DeliveryDecision:
@@ -110,7 +114,16 @@ class NotificationDispatcher:
         if not profiles:
             raise ServiceValidationError("No matching notification profiles configured")
 
-        title = _format_title(notification_type, call_data.get(ATTR_TITLE))
+        scope_prefix = _recipient_scope_prefix(
+            self.entry,
+            target_keys,
+            notification_type,
+        )
+        title = _format_title(
+            notification_type,
+            call_data.get(ATTR_TITLE),
+            scope_prefix,
+        )
         extra_data = _coerce_payload_data(call_data.get(ATTR_DATA))
         dry_run = bool(call_data.get(ATTR_DRY_RUN, False))
         continue_on_error = bool(call_data.get(ATTR_CONTINUE_ON_ERROR, True))
@@ -603,13 +616,82 @@ def _profile_name(profile: dict[str, Any]) -> str:
     )
 
 
-def _format_title(notification_type: str, title: Any) -> str:
-    """Prefix the title with the script-compatible type icon."""
+def _format_title(notification_type: str, title: Any, scope_prefix: str) -> str:
+    """Prefix the title with scope and script-compatible type icons."""
     icon = TYPE_ICONS.get(notification_type, "🔔")
     raw_title = str(title or "").strip()
-    if not raw_title:
-        return icon
-    return f"{icon} {raw_title}"
+    if raw_title:
+        return f"{scope_prefix} {icon} {raw_title}"
+    return f"{scope_prefix} {icon}"
+
+
+def _recipient_scope_prefix(
+    entry: ConfigEntry,
+    target_keys: list[str],
+    notification_type: str,
+) -> str:
+    """Return a visible title prefix for recipient scope."""
+    requested_keys = {_normalize_target_key(key) for key in target_keys}
+
+    if notification_type == TYPE_CRITICAL or requested_keys & TARGET_ALL_ALIASES:
+        return f"{SCOPE_ICON_ALL} Alle"
+
+    matched_group_names = _matched_group_names(entry, requested_keys)
+    if matched_group_names:
+        if len(matched_group_names) == 1:
+            return f"{SCOPE_ICON_GROUP} @{matched_group_names[0]}"
+        return f"{SCOPE_ICON_GROUP} Gruppen"
+
+    matched_profile_names = _matched_profile_names(entry, requested_keys)
+    if len(matched_profile_names) <= 1:
+        return f"{SCOPE_ICON_PERSONAL} Persoenlich"
+    return f"{SCOPE_ICON_GROUP} Mehrere"
+
+
+def _matched_group_names(entry: ConfigEntry, requested_keys: set[str]) -> list[str]:
+    """Return group names matched by target keys."""
+    names: list[str] = []
+    for group in _ensure_mapping_list(entry.options.get(CONF_GROUPS, [])):
+        if not (requested_keys & _group_target_keys(group)):
+            continue
+        name = str(group.get(CONF_NAME) or "Gruppe").strip() or "Gruppe"
+        if name not in names:
+            names.append(name)
+    return names
+
+
+def _matched_profile_names(entry: ConfigEntry, requested_keys: set[str]) -> list[str]:
+    """Return profile names matched by target keys."""
+    names: list[str] = []
+
+    for profile in _ensure_mapping_list(entry.options.get(CONF_PROFILES, [])):
+        profile_name = _profile_name(profile).strip()
+        profile_keys = {
+            _normalize_target_key(profile.get(CONF_PROFILE_ID)),
+            _normalize_target_key(profile_name),
+            _normalize_target_key(profile.get(CONF_PERSON_ENTITY_ID)),
+            _profile_target_key(profile),
+        }
+        if requested_keys & profile_keys and profile_name not in names:
+            names.append(profile_name)
+
+    return names
+
+
+def _ensure_mapping_list(value: Any) -> list[dict[str, Any]]:
+    """Return options data as a list of mappings."""
+    if isinstance(value, dict):
+        raw_items: list[Any] = list(value.values())
+    elif isinstance(value, list):
+        raw_items = value
+    else:
+        raw_items = []
+
+    items: list[dict[str, Any]] = []
+    for item in raw_items:
+        if isinstance(item, dict):
+            items.append(item)
+    return items
 
 
 def _profile_time_window(
