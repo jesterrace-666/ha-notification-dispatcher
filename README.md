@@ -2,6 +2,15 @@
 
 Eine Custom Integration fuer Home Assistant, die Benachrichtigungen zentral an Personen verteilt.
 
+## Release-Linie
+
+Ab Version `1.0.0` traegt die `1.x`-Linie den Beinamen `Herald`.
+Der technische Name bleibt unveraendert:
+
+- Integration: `Notification Dispatcher`
+- Domain: `notification_dispatcher`
+- Action: `notification_dispatcher.send`
+
 ## Was sie kann
 
 - Personenprofile in der Home-Assistant-UI verwalten
