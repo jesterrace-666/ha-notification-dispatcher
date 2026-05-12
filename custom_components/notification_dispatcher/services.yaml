@@ -1,43 +1,30 @@
 send:
-  name: Send notification
-  description: Dispatch a notification to configured people according to their rules.
   fields:
     title:
-      name: Title
-      description: Notification title.
       required: false
       selector:
         text:
     message:
-      name: Message
-      description: Notification message.
       required: true
       selector:
         text:
           multiline: true
     type:
-      name: Type
-      description: Delivery type. Critical bypasses schedule, DND, and home checks.
       required: false
       default: info
       selector:
         select:
+          translation_key: notification_type
           options:
             - critical
             - warning
             - info
             - reminder
-    target_all:
-      name: Send to all recipients
-      description: Send to all configured dispatcher people. For critical notifications this is always applied.
-      required: true
-      default: false
-      selector:
-        boolean:
     target:
-      name: Recipients
-      description: Enter one or more configured dispatcher recipients or groups (for example johannes, person.johannes_michel, familie). Home Assistant people are no longer listed here on purpose.
       required: false
       selector:
-        text:
+        entity:
           multiple: true
+          filter:
+            integration: notification_dispatcher
+            domain: sensor
