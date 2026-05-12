@@ -102,5 +102,39 @@
       "reserved_group_name": "alle/all ist fest eingebaut und kann nicht als Gruppe verwendet werden.",
       "save_failed": "Die Person konnte nicht gespeichert werden. Details stehen im Home-Assistant-Log."
     }
+  },
+  "selector": {
+    "notification_type": {
+      "options": {
+        "critical": "Kritisch",
+        "warning": "Warnung",
+        "info": "Info",
+        "reminder": "Erinnerung"
+      }
+    }
+  },
+  "services": {
+    "send": {
+      "name": "Benachrichtigung senden",
+      "description": "Sendet eine Benachrichtigung nach den Regeln der konfigurierten Dispatcher-Personen.",
+      "fields": {
+        "title": {
+          "name": "Titel",
+          "description": "Titel der Benachrichtigung."
+        },
+        "message": {
+          "name": "Nachricht",
+          "description": "Text der Benachrichtigung."
+        },
+        "type": {
+          "name": "Typ",
+          "description": "Zustelltyp. Kritisch umgeht Zeitfenster, Ruhezeit und Zuhause-Pruefung."
+        },
+        "target": {
+          "name": "Empfaenger",
+          "description": "Waehle einen oder mehrere konfigurierte Dispatcher-Empfaenger oder Gruppen aus, inklusive \"alle\" fuer alle."
+        }
+      }
+    }
   }
 }
