@@ -103,7 +103,7 @@ class NotificationDispatcher:
                 f"Unsupported notification type: {notification_type}"
             )
 
-        target_keys = _target_keys_from_call(call_data)
+        target_keys = _target_keys_from_call(call_data, notification_type)
         profiles = self._select_profiles(target_keys, notification_type)
         if not profiles:
             raise ServiceValidationError("No matching notification profiles configured")
@@ -475,8 +475,14 @@ def _legacy_notify_service_for_entity(
     return None
 
 
-def _target_keys_from_call(call_data: dict[str, Any]) -> list[str]:
+def _target_keys_from_call(
+    call_data: dict[str, Any],
+    notification_type: str,
+) -> list[str]:
     """Return the requested target keys from service data."""
+    if notification_type == TYPE_CRITICAL:
+        return [TARGET_ALL]
+
     if call_data.get(ATTR_TARGET_ALL) is True:
         return [TARGET_ALL]
 
@@ -484,7 +490,9 @@ def _target_keys_from_call(call_data: dict[str, Any]) -> list[str]:
     if not raw_values:
         raw_values = _ensure_list(call_data.get(ATTR_RECIPIENTS))
     if not raw_values:
-        return [TARGET_ALL]
+        raise ServiceValidationError(
+            "Select at least one recipient or enable all recipients"
+        )
 
     target_keys: list[str] = []
     for raw_value in raw_values:
@@ -494,7 +502,12 @@ def _target_keys_from_call(call_data: dict[str, Any]) -> list[str]:
         if target_key not in target_keys:
             target_keys.append(target_key)
 
-    return target_keys or [TARGET_ALL]
+    if not target_keys:
+        raise ServiceValidationError(
+            "Select at least one recipient or enable all recipients"
+        )
+
+    return target_keys
 
 
 def _ensure_list(value: Any) -> list[Any]:
