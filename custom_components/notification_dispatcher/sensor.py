@@ -21,7 +21,6 @@ from .const import (
     CONF_PROFILE_ID,
     CONF_PROFILES,
     CONF_TARGET_KEY,
-    DOMAIN,
     TARGET_ALL,
     TARGET_TYPE_ALL,
     TARGET_TYPE_GROUP,
@@ -112,7 +111,6 @@ class DispatcherRecipientSensor(SensorEntity):
         group_id: str | None = None,
     ) -> None:
         """Initialize one dispatcher recipient sensor."""
-        self._entry_id = entry_id
         self._attr_unique_id = f"{entry_id}_{object_id}"
         self._attr_object_id = object_id
         self._attr_name = name
@@ -127,16 +125,6 @@ class DispatcherRecipientSensor(SensorEntity):
             attributes[ATTR_DISPATCHER_GROUP_ID] = group_id
 
         self._attr_extra_state_attributes = attributes
-
-    @property
-    def device_info(self) -> dict[str, Any]:
-        """Describe the integration-level device for selector entities."""
-        return {
-            "identifiers": {(DOMAIN, self._entry_id)},
-            "name": "Notification Dispatcher",
-            "manufacturer": "Notification Dispatcher",
-            "model": "Recipient Selector",
-        }
 
 
 def _coerce_mapping_list(value: Any) -> list[dict[str, Any]]:

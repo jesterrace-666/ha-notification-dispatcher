@@ -135,6 +135,28 @@
           "description": "Select one or more configured dispatcher recipients or groups, including \"Alle\" for all."
         }
       }
+    },
+    "notify": {
+      "name": "Notify",
+      "description": "Short alias for notification_dispatcher.send with identical behavior.",
+      "fields": {
+        "title": {
+          "name": "Title",
+          "description": "Notification title."
+        },
+        "message": {
+          "name": "Message",
+          "description": "Notification message."
+        },
+        "type": {
+          "name": "Type",
+          "description": "Delivery type. Critical bypasses schedule, DND, and home checks."
+        },
+        "target": {
+          "name": "Recipients",
+          "description": "Select one or more configured dispatcher recipients or groups, including \"Alle\" for all."
+        }
+      }
     }
   }
 }

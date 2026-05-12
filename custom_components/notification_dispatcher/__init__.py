@@ -27,6 +27,7 @@ from .const import (
     DOMAIN,
     NAME,
     NOTIFICATION_TYPES,
+    SERVICE_NOTIFY,
     SERVICE_SEND,
 )
 from .dispatcher import NotificationDispatcher
@@ -68,10 +69,12 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
             _LOGGER.warning("Notification Dispatcher had failed targets: %s", result)
         return result
 
-    if not hass.services.has_service(DOMAIN, SERVICE_SEND):
+    for service_name in (SERVICE_SEND, SERVICE_NOTIFY):
+        if hass.services.has_service(DOMAIN, service_name):
+            continue
         hass.services.async_register(
             DOMAIN,
-            SERVICE_SEND,
+            service_name,
             async_handle_send,
             schema=SERVICE_SEND_SCHEMA,
             supports_response=SupportsResponse.OPTIONAL,

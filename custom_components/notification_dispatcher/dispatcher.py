@@ -18,6 +18,7 @@ from .const import (
     ATTR_DATA,
     ATTR_DISPATCHER_TARGET_KEY,
     ATTR_DRY_RUN,
+    ATTR_ENTITY_ID,
     ATTR_MESSAGE,
     ATTR_RECIPIENTS,
     ATTR_TARGET,
@@ -490,11 +491,11 @@ def _target_keys_from_call(
 
     raw_values = _ensure_list(call_data.get(ATTR_TARGET))
     if not raw_values:
+        raw_values = _ensure_list(call_data.get(ATTR_ENTITY_ID))
+    if not raw_values:
         raw_values = _ensure_list(call_data.get(ATTR_RECIPIENTS))
     if not raw_values:
-        raise ServiceValidationError(
-            "Select at least one recipient or enable all recipients"
-        )
+        raise ServiceValidationError("Select at least one recipient")
 
     target_keys: list[str] = []
     for raw_value in raw_values:
@@ -507,9 +508,7 @@ def _target_keys_from_call(
                 target_keys.append(target_key)
 
     if not target_keys:
-        raise ServiceValidationError(
-            "Select at least one recipient or enable all recipients"
-        )
+        raise ServiceValidationError("Select at least one recipient")
 
     return target_keys
 
