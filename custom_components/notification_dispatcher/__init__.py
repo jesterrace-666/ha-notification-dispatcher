@@ -48,7 +48,7 @@ SERVICE_SEND_SCHEMA = vol.Schema(
             vol.All(cv.ensure_list, [cv.string]),
         ),
         vol.Optional(ATTR_RECIPIENTS): vol.All(cv.ensure_list, [cv.string]),
-        vol.Optional(ATTR_DATA): vol.Any(None, dict),
+        vol.Optional(ATTR_DATA): object,
         vol.Optional(ATTR_DRY_RUN, default=False): cv.boolean,
         vol.Optional(ATTR_CONTINUE_ON_ERROR, default=True): cv.boolean,
     },
@@ -63,7 +63,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     async def async_handle_send(call: ServiceCall) -> dict[str, Any]:
         """Handle the send action."""
         dispatcher = _get_dispatcher(hass, call.data.get(ATTR_CONFIG_ENTRY_ID))
-        result = await dispatcher.async_send(dict(call.data))
+        result = await dispatcher.async_send(_normalize_call_data(call.data))
         if result["failed"]:
             _LOGGER.warning("Notification Dispatcher had failed targets: %s", result)
         return result
@@ -116,3 +116,27 @@ def _get_dispatcher(
             return domain_data[entry.entry_id]
 
     raise ServiceValidationError("No loaded Notification Dispatcher entry found")
+
+
+def _normalize_call_data(call_data: dict[str, Any]) -> dict[str, Any]:
+    """Normalize service call data before dispatching."""
+    normalized = dict(call_data)
+    raw_payload = normalized.get(ATTR_DATA)
+    if raw_payload is None:
+        normalized.pop(ATTR_DATA, None)
+        return normalized
+
+    if isinstance(raw_payload, str):
+        if raw_payload.strip().casefold() in {"", "none", "null"}:
+            normalized.pop(ATTR_DATA, None)
+            return normalized
+
+    if isinstance(raw_payload, dict):
+        return normalized
+
+    _LOGGER.debug(
+        "Ignoring unsupported notification_dispatcher.send data payload type: %s",
+        type(raw_payload).__name__,
+    )
+    normalized.pop(ATTR_DATA, None)
+    return normalized
