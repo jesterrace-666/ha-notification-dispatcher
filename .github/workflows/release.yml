@@ -30,11 +30,22 @@ jobs:
           )
           echo "value=$VERSION" >> "$GITHUB_OUTPUT"
 
+      - name: Build release name
+        id: release_name
+        shell: bash
+        run: |
+          VERSION="${{ steps.version.outputs.value }}"
+          if [[ "$VERSION" == 1.* ]]; then
+            echo "value=v$VERSION Herald" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=v$VERSION" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Create or update release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.version.outputs.value }}
-          name: v${{ steps.version.outputs.value }}
+          name: ${{ steps.release_name.outputs.value }}
           target_commitish: main
           make_latest: true
           generate_release_notes: true
