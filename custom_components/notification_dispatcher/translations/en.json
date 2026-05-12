@@ -102,5 +102,39 @@
       "reserved_group_name": "all/alle is built in and cannot be used as a group name.",
       "save_failed": "The person could not be saved. Details are available in the Home Assistant log."
     }
+  },
+  "selector": {
+    "notification_type": {
+      "options": {
+        "critical": "Critical",
+        "warning": "Warning",
+        "info": "Info",
+        "reminder": "Reminder"
+      }
+    }
+  },
+  "services": {
+    "send": {
+      "name": "Send notification",
+      "description": "Dispatch a notification to configured dispatcher people according to their rules.",
+      "fields": {
+        "title": {
+          "name": "Title",
+          "description": "Notification title."
+        },
+        "message": {
+          "name": "Message",
+          "description": "Notification message."
+        },
+        "type": {
+          "name": "Type",
+          "description": "Delivery type. Critical bypasses schedule, DND, and home checks."
+        },
+        "target": {
+          "name": "Recipients",
+          "description": "Select one or more configured dispatcher recipients or groups, including \"Alle\" for all."
+        }
+      }
+    }
   }
 }
