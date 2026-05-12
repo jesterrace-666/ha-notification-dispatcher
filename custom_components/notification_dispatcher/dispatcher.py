@@ -109,7 +109,7 @@ class NotificationDispatcher:
             raise ServiceValidationError("No matching notification profiles configured")
 
         title = _format_title(notification_type, call_data.get(ATTR_TITLE))
-        extra_data = call_data.get(ATTR_DATA) or {}
+        extra_data = _coerce_payload_data(call_data.get(ATTR_DATA))
         dry_run = bool(call_data.get(ATTR_DRY_RUN, False))
         continue_on_error = bool(call_data.get(ATTR_CONTINUE_ON_ERROR, True))
 
@@ -378,10 +378,26 @@ class NotificationDispatcher:
         service_data: dict[str, Any] = {"message": message}
         if title:
             service_data["title"] = title
-        if payload_data:
-            service_data["data"] = payload_data
 
         if self.hass.states.get(target) is not None:
+            if payload_data:
+                legacy_service = _legacy_notify_service_for_entity(self.hass, target)
+                if legacy_service is not None:
+                    legacy_data = dict(service_data)
+                    legacy_data["data"] = payload_data
+                    await self.hass.services.async_call(
+                        "notify",
+                        legacy_service,
+                        legacy_data,
+                        blocking=True,
+                    )
+                    return
+                _LOGGER.debug(
+                    "Notify entity %s has no compatible legacy service for payload data;"
+                    " sending without extra payload",
+                    target,
+                )
+
             service_data["entity_id"] = target
             await self.hass.services.async_call(
                 "notify",
@@ -390,6 +406,9 @@ class NotificationDispatcher:
                 blocking=True,
             )
             return
+
+        if payload_data:
+            service_data["data"] = payload_data
 
         domain, service = target.split(".", 1)
         await self.hass.services.async_call(
@@ -425,6 +444,35 @@ def _normalize_notify_target(target: Any) -> str:
             "Notify target must include a service or entity name"
         )
     return normalized
+
+
+def _legacy_notify_service_for_entity(
+    hass: HomeAssistant, entity_id: str
+) -> str | None:
+    """Return a compatible legacy notify service for a notify entity."""
+    if not entity_id.startswith("notify."):
+        return None
+
+    state = hass.states.get(entity_id)
+    if state is None:
+        return None
+
+    entity_key = entity_id.split(".", 1)[1]
+    candidates: list[str] = []
+    for value in (
+        state.attributes.get("service"),
+        entity_key,
+        f"mobile_app_{entity_key}" if not entity_key.startswith("mobile_app_") else "",
+    ):
+        candidate = str(value or "").strip()
+        if candidate and candidate not in candidates:
+            candidates.append(candidate)
+
+    for service in candidates:
+        if hass.services.has_service("notify", service):
+            return service
+
+    return None
 
 
 def _target_keys_from_call(call_data: dict[str, Any]) -> list[str]:
@@ -610,12 +658,12 @@ def _default_payload_data(notification_type: str) -> dict[str, Any]:
                     "name": "default",
                     "critical": 1,
                     "volume": 1.0,
-                }
+                },
+                "interruption-level": "critical",
             },
             "ttl": 0,
             "priority": "high",
             "importance": "high",
-            "interruption-level": "critical",
         }
 
     if notification_type == TYPE_WARNING:
@@ -630,6 +678,17 @@ def _default_payload_data(notification_type: str) -> dict[str, Any]:
     if notification_type == TYPE_INFO:
         return {}
 
+    return {}
+
+
+def _coerce_payload_data(value: Any) -> dict[str, Any]:
+    """Coerce optional payload data to a dictionary."""
+    if isinstance(value, dict):
+        return value
+    if value is None:
+        return {}
+    if isinstance(value, str) and value.strip().casefold() in {"", "none", "null"}:
+        return {}
     return {}
 
 
