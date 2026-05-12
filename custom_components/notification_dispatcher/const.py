@@ -2,6 +2,8 @@
 
 DOMAIN = "notification_dispatcher"
 NAME = "Notification Dispatcher"
+BUILD_SERIES = "1.x"
+BUILD_CODENAME = "Herald"
 
 SERVICE_SEND = "send"
 
