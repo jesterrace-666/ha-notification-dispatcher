@@ -1,9 +1,8 @@
 send:
   target:
     entity:
-      filter:
-        integration: notification_dispatcher
-        domain: sensor
+      integration: notification_dispatcher
+      domain: sensor
   fields:
     title:
       required: false

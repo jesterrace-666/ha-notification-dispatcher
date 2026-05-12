@@ -33,6 +33,7 @@ from .dispatcher import NotificationDispatcher
 
 _LOGGER = logging.getLogger(__name__)
 PLATFORMS = [Platform.SENSOR]
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 SERVICE_SEND_SCHEMA = vol.Schema(
     {
