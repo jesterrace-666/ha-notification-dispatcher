@@ -20,9 +20,7 @@ from .const import (
     ATTR_DATA,
     ATTR_DRY_RUN,
     ATTR_MESSAGE,
-    ATTR_RECIPIENTS,
     ATTR_TARGET,
-    ATTR_TARGET_ALL,
     ATTR_TITLE,
     ATTR_TYPE,
     DEFAULT_NOTIFICATION_TYPE,
@@ -44,12 +42,11 @@ SERVICE_SEND_SCHEMA = vol.Schema(
         vol.Optional(ATTR_TYPE, default=DEFAULT_NOTIFICATION_TYPE): vol.In(
             NOTIFICATION_TYPES
         ),
-        vol.Optional(ATTR_TARGET_ALL, default=False): cv.boolean,
         vol.Optional(ATTR_TARGET): vol.Any(
             cv.string,
             vol.All(cv.ensure_list, [cv.string]),
+            dict,
         ),
-        vol.Optional(ATTR_RECIPIENTS): vol.All(cv.ensure_list, [cv.string]),
         vol.Optional(ATTR_DATA): object,
         vol.Optional(ATTR_DRY_RUN, default=False): cv.boolean,
         vol.Optional(ATTR_CONTINUE_ON_ERROR, default=True): cv.boolean,

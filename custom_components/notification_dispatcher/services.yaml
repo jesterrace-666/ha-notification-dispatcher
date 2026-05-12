@@ -1,4 +1,9 @@
 send:
+  target:
+    entity:
+      filter:
+        integration: notification_dispatcher
+        domain: sensor
   fields:
     title:
       required: false
@@ -20,11 +25,3 @@ send:
             - warning
             - info
             - reminder
-    target:
-      required: false
-      selector:
-        entity:
-          multiple: true
-          filter:
-            integration: notification_dispatcher
-            domain: sensor
