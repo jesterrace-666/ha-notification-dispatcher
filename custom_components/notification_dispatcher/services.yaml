@@ -36,10 +36,8 @@ send:
         boolean:
     target:
       name: Recipients
-      description: Select one or more Home Assistant people. Only people configured in the dispatcher will receive notifications.
+      description: Enter one or more configured dispatcher recipients or groups (for example johannes, person.johannes_michel, familie). Home Assistant people are no longer listed here on purpose.
       required: false
       selector:
-        entity:
+        text:
           multiple: true
-          filter:
-            - domain: person
