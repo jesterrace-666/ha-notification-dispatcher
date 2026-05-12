@@ -4,7 +4,6 @@ DOMAIN = "notification_dispatcher"
 NAME = "Notification Dispatcher"
 
 SERVICE_SEND = "send"
-SERVICE_NOTIFY = "notify"
 
 CONF_INSTANCE_NAME = "instance_name"
 CONF_PROFILES = "profiles"

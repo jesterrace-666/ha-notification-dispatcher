@@ -135,28 +135,6 @@
           "description": "Waehle einen oder mehrere konfigurierte Dispatcher-Empfaenger oder Gruppen aus, inklusive \"alle\" fuer alle."
         }
       }
-    },
-    "notify": {
-      "name": "Notify senden",
-      "description": "Kurzname fuer notification_dispatcher.send mit identischem Verhalten.",
-      "fields": {
-        "title": {
-          "name": "Titel",
-          "description": "Titel der Benachrichtigung."
-        },
-        "message": {
-          "name": "Nachricht",
-          "description": "Text der Benachrichtigung."
-        },
-        "type": {
-          "name": "Typ",
-          "description": "Zustelltyp. Kritisch umgeht Zeitfenster, Ruhezeit und Zuhause-Pruefung."
-        },
-        "target": {
-          "name": "Empfaenger",
-          "description": "Waehle einen oder mehrere konfigurierte Dispatcher-Empfaenger oder Gruppen aus, inklusive \"alle\" fuer alle."
-        }
-      }
     }
   }
 }
