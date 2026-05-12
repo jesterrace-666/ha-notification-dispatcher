@@ -16,6 +16,7 @@ from homeassistant.util import dt as dt_util
 from .const import (
     ATTR_CONTINUE_ON_ERROR,
     ATTR_DATA,
+    ATTR_DISPATCHER_TARGET_KEY,
     ATTR_DRY_RUN,
     ATTR_MESSAGE,
     ATTR_RECIPIENTS,
@@ -103,7 +104,7 @@ class NotificationDispatcher:
                 f"Unsupported notification type: {notification_type}"
             )
 
-        target_keys = _target_keys_from_call(call_data, notification_type)
+        target_keys = _target_keys_from_call(self.hass, call_data, notification_type)
         profiles = self._select_profiles(target_keys, notification_type)
         if not profiles:
             raise ServiceValidationError("No matching notification profiles configured")
@@ -476,6 +477,7 @@ def _legacy_notify_service_for_entity(
 
 
 def _target_keys_from_call(
+    hass: HomeAssistant,
     call_data: dict[str, Any],
     notification_type: str,
 ) -> list[str]:
@@ -496,11 +498,13 @@ def _target_keys_from_call(
 
     target_keys: list[str] = []
     for raw_value in raw_values:
-        target_key = _normalize_target_key(_extract_target_value(raw_value))
-        if target_key in {"", *TARGET_ALL_ALIASES}:
-            return [TARGET_ALL]
-        if target_key not in target_keys:
-            target_keys.append(target_key)
+        for extracted_value in _extract_target_values(raw_value):
+            resolved_value = _target_key_from_entity_id(hass, extracted_value)
+            target_key = _normalize_target_key(resolved_value)
+            if target_key in {"", *TARGET_ALL_ALIASES}:
+                return [TARGET_ALL]
+            if target_key not in target_keys:
+                target_keys.append(target_key)
 
     if not target_keys:
         raise ServiceValidationError(
@@ -519,18 +523,44 @@ def _ensure_list(value: Any) -> list[Any]:
     return [value]
 
 
-def _extract_target_value(value: Any) -> Any:
-    """Extract the underlying value from selector-like dictionaries."""
-    if not isinstance(value, dict):
+def _extract_target_values(value: Any) -> list[Any]:
+    """Extract one or many selector values."""
+    if isinstance(value, list):
         return value
+
+    if not isinstance(value, dict):
+        return [value]
+
     if "entity_id" in value:
         entity_value = value["entity_id"]
         if isinstance(entity_value, list):
-            return entity_value[0] if entity_value else ""
-        return entity_value
+            return entity_value
+        return [entity_value]
+
     for key in ("value", "id"):
         if key in value:
-            return value[key]
+            raw_value = value[key]
+            if isinstance(raw_value, list):
+                return raw_value
+            return [raw_value]
+
+    return [value]
+
+
+def _target_key_from_entity_id(hass: HomeAssistant, value: Any) -> Any:
+    """Resolve dispatcher selector entities to their configured target key."""
+    entity_id = str(value or "").strip()
+    if not entity_id.startswith("sensor."):
+        return value
+
+    state = hass.states.get(entity_id)
+    if state is None:
+        return value
+
+    target_key = state.attributes.get(ATTR_DISPATCHER_TARGET_KEY)
+    if isinstance(target_key, str) and target_key.strip():
+        return target_key
+
     return value
 
 
