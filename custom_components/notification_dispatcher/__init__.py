@@ -23,6 +23,8 @@ from .const import (
     ATTR_TARGET,
     ATTR_TITLE,
     ATTR_TYPE,
+    BUILD_CODENAME,
+    BUILD_SERIES,
     DEFAULT_NOTIFICATION_TYPE,
     DOMAIN,
     NAME,
@@ -59,6 +61,12 @@ SERVICE_SEND_SCHEMA = vol.Schema(
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Set up Notification Dispatcher."""
     hass.data.setdefault(DOMAIN, {})
+    _LOGGER.info(
+        "Starting %s (%s - %s)",
+        NAME,
+        BUILD_SERIES,
+        BUILD_CODENAME,
+    )
 
     async def async_handle_send(call: ServiceCall) -> dict[str, Any]:
         """Handle the send action."""
