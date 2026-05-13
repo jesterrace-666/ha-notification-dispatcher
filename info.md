@@ -22,3 +22,7 @@ Built-in groups:
 
 - `all/alle` (non-removable)
 - `fallback` (non-removable): receives rerouted notifications when originally selected recipients are skipped because of schedule, DND, or home checks.
+
+Release highlight:
+
+- `v1.2.0 Herald`: adds built-in fallback-group based rerouting for skipped recipients.
