@@ -50,7 +50,11 @@ from .const import (
     DOMAIN,
     NAME,
     OPTIONAL_NOTIFICATION_TYPES,
+    SYSTEM_GROUP_FALLBACK_ID,
+    SYSTEM_GROUP_FALLBACK_NAME,
+    SYSTEM_GROUP_FALLBACK_TARGET_KEY,
     TYPE_CRITICAL,
+    TYPE_INFO,
 )
 
 _WINDOW_SPLITTER = re.compile(r"\s*(?:-|\bbis\b|\bto\b)\s*", re.IGNORECASE)
@@ -80,7 +84,7 @@ class NotificationDispatcherConfigFlow(config_entries.ConfigFlow, domain=DOMAIN)
         return self.async_create_entry(
             title=NAME,
             data={},
-            options={CONF_PROFILES: [], CONF_GROUPS: []},
+            options={CONF_PROFILES: [], CONF_GROUPS: [_fallback_group()]},
         )
 
     @staticmethod
@@ -101,9 +105,11 @@ class NotificationDispatcherOptionsFlow(config_entries.OptionsFlowWithReload):
         """Show the options menu."""
         menu_options = ["add_person"]
         if self._profiles:
-            menu_options.extend(["edit_person", "remove_person", "add_group"])
-        if self._groups:
-            menu_options.extend(["edit_group", "remove_group"])
+            menu_options.extend(
+                ["edit_person", "remove_person", "add_group", "edit_group"]
+            )
+        if self._custom_groups:
+            menu_options.append("remove_group")
 
         return self.async_show_menu(step_id="init", menu_options=menu_options)
 
@@ -213,7 +219,10 @@ class NotificationDispatcherOptionsFlow(config_entries.OptionsFlowWithReload):
                 for profile in self._profiles
                 if profile.get(CONF_PROFILE_ID) != profile_id
             ]
-            groups = [_group_without_member(group, profile_id) for group in self._groups]
+            groups = [
+                _group_without_member(group, profile_id)
+                for group in self._groups
+            ]
             return self.async_create_entry(
                 data=self._updated_options(profiles=profiles, groups=groups)
             )
@@ -240,7 +249,9 @@ class NotificationDispatcherOptionsFlow(config_entries.OptionsFlowWithReload):
             errors = _group_errors(self._groups, group)
             if not errors:
                 groups = [*self._groups, group]
-                return self.async_create_entry(data=self._updated_options(groups=groups))
+                return self.async_create_entry(
+                    data=self._updated_options(groups=groups)
+                )
 
         return self.async_show_form(
             step_id="add_group",
@@ -250,6 +261,9 @@ class NotificationDispatcherOptionsFlow(config_entries.OptionsFlowWithReload):
 
     async def async_step_edit_group(self, user_input: dict[str, Any] | None = None):
         """Select a notification group to edit."""
+        if not self._profiles:
+            return await self.async_step_init()
+
         if user_input is not None:
             self._selected_profile_id = user_input[CONF_GROUP_ID]
             return await self.async_step_edit_group_details()
@@ -288,29 +302,44 @@ class NotificationDispatcherOptionsFlow(config_entries.OptionsFlowWithReload):
                     else item
                     for item in self._groups
                 ]
-                return self.async_create_entry(data=self._updated_options(groups=groups))
+                return self.async_create_entry(
+                    data=self._updated_options(groups=groups)
+                )
 
         return self.async_show_form(
             step_id="edit_group_details",
-            data_schema=_group_schema(self._profiles, group),
+            data_schema=_group_schema(
+                self._profiles,
+                group,
+                allow_name_edit=not _is_fallback_group(group),
+            ),
             errors=errors,
         )
 
     async def async_step_remove_group(self, user_input: dict[str, Any] | None = None):
         """Remove a notification group."""
+        if not self._custom_groups:
+            return await self.async_step_init()
+
         if user_input is not None:
             group_id = user_input[CONF_GROUP_ID]
             groups = [
-                group for group in self._groups if group.get(CONF_GROUP_ID) != group_id
+                group
+                for group in self._groups
+                if group.get(CONF_GROUP_ID) != group_id
             ]
-            return self.async_create_entry(data=self._updated_options(groups=groups))
+            return self.async_create_entry(
+                data=self._updated_options(groups=groups)
+            )
 
         return self.async_show_form(
             step_id="remove_group",
             data_schema=vol.Schema(
                 {
                     vol.Required(CONF_GROUP_ID): SelectSelector(
-                        SelectSelectorConfig(options=_group_select_options(self._groups))
+                        SelectSelectorConfig(
+                            options=_group_select_options(self._custom_groups)
+                        )
                     )
                 }
             ),
@@ -324,7 +353,14 @@ class NotificationDispatcherOptionsFlow(config_entries.OptionsFlowWithReload):
     @property
     def _groups(self) -> list[dict[str, Any]]:
         """Return configured notification groups."""
-        return _coerce_mapping_list(self.config_entry.options.get(CONF_GROUPS, []))
+        return _ensure_system_groups(
+            _coerce_mapping_list(self.config_entry.options.get(CONF_GROUPS, []))
+        )
+
+    @property
+    def _custom_groups(self) -> list[dict[str, Any]]:
+        """Return user-defined groups without system groups."""
+        return [group for group in self._groups if not _is_fallback_group(group)]
 
     @property
     def _selected_profile(self) -> dict[str, Any] | None:
@@ -355,7 +391,8 @@ class NotificationDispatcherOptionsFlow(config_entries.OptionsFlowWithReload):
         """Return options while preserving unrelated values."""
         options = dict(self.config_entry.options)
         options[CONF_PROFILES] = self._profiles if profiles is None else profiles
-        options[CONF_GROUPS] = self._groups if groups is None else groups
+        raw_groups = self._groups if groups is None else groups
+        options[CONF_GROUPS] = _ensure_system_groups(raw_groups)
         return options
 
 
@@ -391,7 +428,9 @@ def _profile_schema(
             ): notify_target_selector,
             vol.Optional(
                 CONF_ENABLED_TYPES,
-                default=_optional_enabled_types(profile.get(CONF_ENABLED_TYPES, [])),
+                default=_optional_enabled_types(
+                    profile.get(CONF_ENABLED_TYPES, [TYPE_INFO])
+                ),
             ): SelectSelector(
                 SelectSelectorConfig(
                     options=OPTIONAL_NOTIFICATION_TYPES,
@@ -536,23 +575,28 @@ def _profile_label(profile: dict[str, Any]) -> str:
 def _group_schema(
     profiles: list[dict[str, Any]],
     group: dict[str, Any] | None = None,
+    *,
+    allow_name_edit: bool = True,
 ) -> vol.Schema:
     """Build the group schema."""
     group = group or {}
-    return vol.Schema(
-        {
+    schema: dict[Any, Any] = {
+        vol.Required(
+            CONF_GROUP_MEMBERS,
+            default=list(group.get(CONF_GROUP_MEMBERS, [])),
+        ): SelectSelector(
+            SelectSelectorConfig(
+                options=_profile_select_options(profiles),
+                multiple=True,
+            )
+        )
+    }
+    if allow_name_edit:
+        schema = {
             vol.Required(CONF_NAME, default=group.get(CONF_NAME, "")): TextSelector(),
-            vol.Required(
-                CONF_GROUP_MEMBERS,
-                default=list(group.get(CONF_GROUP_MEMBERS, [])),
-            ): SelectSelector(
-                SelectSelectorConfig(
-                    options=_profile_select_options(profiles),
-                    multiple=True,
-                )
-            ),
+            **schema,
         }
-    )
+    return vol.Schema(schema)
 
 
 def _group_from_user_input(
@@ -561,14 +605,27 @@ def _group_from_user_input(
 ) -> dict[str, Any]:
     """Create a stored group from form input."""
     existing = existing or {}
-    name = str(user_input.get(CONF_NAME, "")).strip()
-    target_key = (
-        existing.get(CONF_TARGET_KEY)
-        if existing.get(CONF_NAME) == name
-        else _normalize_target_key(name)
-    )
+    is_fallback_group = _is_fallback_group(existing)
+
+    if is_fallback_group:
+        name = SYSTEM_GROUP_FALLBACK_NAME
+        target_key = SYSTEM_GROUP_FALLBACK_TARGET_KEY
+        group_id = SYSTEM_GROUP_FALLBACK_ID
+    else:
+        if CONF_NAME in user_input:
+            name = str(user_input.get(CONF_NAME, "")).strip()
+        else:
+            name = str(existing.get(CONF_NAME, "")).strip()
+
+        target_key = (
+            existing.get(CONF_TARGET_KEY)
+            if existing.get(CONF_NAME) == name
+            else _normalize_target_key(name)
+        )
+        group_id = str(existing.get(CONF_GROUP_ID, uuid4().hex))
+
     return {
-        CONF_GROUP_ID: existing.get(CONF_GROUP_ID, uuid4().hex),
+        CONF_GROUP_ID: group_id,
         CONF_NAME: name,
         CONF_TARGET_KEY: target_key or _normalize_target_key(name),
         CONF_GROUP_MEMBERS: _ensure_list(user_input.get(CONF_GROUP_MEMBERS)),
@@ -581,12 +638,15 @@ def _group_errors(
     current_group_id: str | None = None,
 ) -> dict[str, str]:
     """Validate a group and return Home Assistant form errors."""
+    if _is_fallback_group(group):
+        return {}
+
     errors: dict[str, str] = {}
     target_key = _normalize_target_key(group.get(CONF_TARGET_KEY))
 
     if not group.get(CONF_NAME):
         errors[CONF_NAME] = "missing_group_name"
-    elif target_key in TARGET_ALL_ALIASES:
+    elif target_key in {SYSTEM_GROUP_FALLBACK_TARGET_KEY, *TARGET_ALL_ALIASES}:
         errors[CONF_NAME] = "reserved_group_name"
     elif _group_key_exists(groups, target_key, current_group_id):
         errors[CONF_NAME] = "duplicate_group"
@@ -628,6 +688,8 @@ def _group_label(group: dict[str, Any]) -> str:
     """Return a human readable group label."""
     members = group.get(CONF_GROUP_MEMBERS, [])
     member_count = len(members) if isinstance(members, list) else 0
+    if _is_fallback_group(group):
+        return f"{SYSTEM_GROUP_FALLBACK_NAME} ({member_count} Personen)"
     return f"{group.get(CONF_NAME, 'Gruppe')} ({member_count} Personen)"
 
 
@@ -640,6 +702,46 @@ def _group_without_member(group: dict[str, Any], profile_id: str) -> dict[str, A
         if member_id != profile_id
     ]
     return updated_group
+
+
+def _fallback_group(existing: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Return the built-in fallback group."""
+    existing = existing or {}
+    return {
+        CONF_GROUP_ID: SYSTEM_GROUP_FALLBACK_ID,
+        CONF_NAME: SYSTEM_GROUP_FALLBACK_NAME,
+        CONF_TARGET_KEY: SYSTEM_GROUP_FALLBACK_TARGET_KEY,
+        CONF_GROUP_MEMBERS: _ensure_list(existing.get(CONF_GROUP_MEMBERS)),
+    }
+
+
+def _ensure_system_groups(groups: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Ensure built-in groups are present and normalized."""
+    normalized_groups: list[dict[str, Any]] = []
+    fallback: dict[str, Any] | None = None
+
+    for group in groups:
+        if _is_fallback_group(group):
+            if fallback is None:
+                fallback = _fallback_group(group)
+            continue
+        normalized_groups.append(group)
+
+    normalized_groups.append(_fallback_group(fallback))
+    return normalized_groups
+
+
+def _is_fallback_group(group: dict[str, Any]) -> bool:
+    """Return whether a group is the built-in fallback group."""
+    if str(group.get(CONF_GROUP_ID, "")).strip() == SYSTEM_GROUP_FALLBACK_ID:
+        return True
+
+    target_key = _normalize_target_key(group.get(CONF_TARGET_KEY))
+    if target_key == SYSTEM_GROUP_FALLBACK_TARGET_KEY:
+        return True
+
+    group_name = _normalize_target_key(group.get(CONF_NAME))
+    return group_name == SYSTEM_GROUP_FALLBACK_TARGET_KEY
 
 
 def _person_name(hass: HomeAssistant, person_entity_id: str) -> str:
