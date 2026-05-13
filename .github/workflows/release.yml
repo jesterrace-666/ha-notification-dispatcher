@@ -9,11 +9,14 @@ on:
 permissions:
   contents: write
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Read version from manifest
         id: version
@@ -29,6 +32,16 @@ jobs:
           PY
           )
           echo "value=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Ensure version has no existing tag
+        shell: bash
+        run: |
+          VERSION="${{ steps.version.outputs.value }}"
+          git fetch --tags --force
+          if git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then
+            echo "Version v$VERSION already exists. Bump manifest.json version before pushing."
+            exit 1
+          fi
 
       - name: Build release name
         id: release_name
