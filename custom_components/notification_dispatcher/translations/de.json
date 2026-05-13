@@ -42,8 +42,7 @@
         "description": "Trage Zeitfenster als HH:MM-HH:MM ein, zum Beispiel 08:00-22:00.",
         "data": {
           "weekday_window": "Werktage (HH:MM-HH:MM)",
-          "weekend_window": "Wochenende (HH:MM-HH:MM)",
-          "dnd_window": "Ruhezeit (HH:MM-HH:MM)"
+          "weekend_window": "Wochenende (HH:MM-HH:MM)"
         }
       },
       "edit_person": {
@@ -69,8 +68,7 @@
         "description": "Trage Zeitfenster als HH:MM-HH:MM ein, zum Beispiel 08:00-22:00.",
         "data": {
           "weekday_window": "Werktage (HH:MM-HH:MM)",
-          "weekend_window": "Wochenende (HH:MM-HH:MM)",
-          "dnd_window": "Ruhezeit (HH:MM-HH:MM)"
+          "weekend_window": "Wochenende (HH:MM-HH:MM)"
         }
       },
       "remove_person": {
@@ -89,7 +87,7 @@
       },
       "manage_fallback": {
         "title": "Fallback-Gruppe verwalten",
-        "description": "Die Fallback-Gruppe ist fest eingebaut und nicht loeschbar. Waehle hier die Personen, die Nachrichten erhalten, wenn eigentliche Empfaenger wegen Zeitfenster, Ruhezeit oder Zuhause-Pruefung uebersprungen wurden.",
+        "description": "Die Fallback-Gruppe ist fest eingebaut und nicht loeschbar. Waehle hier die Personen, die Nachrichten erhalten, wenn eigentliche Empfaenger wegen Zeitfenster oder Zuhause-Pruefung uebersprungen wurden.",
         "data": {
           "group_members": "Fallback-Personen"
         }
@@ -156,7 +154,7 @@
         },
         "type": {
           "name": "Typ",
-          "description": "Zustelltyp. Kritisch umgeht Zeitfenster, Ruhezeit und Zuhause-Pruefung."
+          "description": "Zustelltyp. Kritisch umgeht Zeitfenster und Zuhause-Pruefung."
         },
         "target": {
           "name": "Empfaenger",
