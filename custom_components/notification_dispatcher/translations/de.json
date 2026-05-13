@@ -17,6 +17,7 @@
         "title": "Notification Dispatcher Optionen",
         "menu_options": {
           "add_person": "Person hinzufuegen",
+          "manage_fallback": "Fallback-Gruppe verwalten",
           "edit_person": "Person bearbeiten",
           "remove_person": "Person entfernen",
           "add_group": "Gruppe hinzufuegen",
@@ -69,6 +70,17 @@
           "name": "Gruppenname",
           "group_members": "Personen"
         }
+      },
+      "manage_fallback": {
+        "title": "Fallback-Gruppe verwalten",
+        "description": "Die Fallback-Gruppe ist fest eingebaut und nicht loeschbar. Waehle hier die Personen, die Nachrichten erhalten, wenn eigentliche Empfaenger wegen Zeitfenster, Ruhezeit oder Zuhause-Pruefung uebersprungen wurden.",
+        "data": {
+          "group_members": "Fallback-Personen"
+        }
+      },
+      "manage_fallback_empty": {
+        "title": "Fallback-Gruppe verwalten",
+        "description": "Lege zuerst mindestens eine Person an. Danach kannst du hier die Fallback-Personen auswaehlen."
       },
       "edit_group": {
         "title": "Gruppe auswaehlen",
