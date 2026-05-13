@@ -42,8 +42,7 @@
         "description": "Enter windows as HH:MM-HH:MM, for example 08:00-22:00.",
         "data": {
           "weekday_window": "Weekdays (HH:MM-HH:MM)",
-          "weekend_window": "Weekend (HH:MM-HH:MM)",
-          "dnd_window": "Quiet hours (HH:MM-HH:MM)"
+          "weekend_window": "Weekend (HH:MM-HH:MM)"
         }
       },
       "edit_person": {
@@ -69,8 +68,7 @@
         "description": "Enter windows as HH:MM-HH:MM, for example 08:00-22:00.",
         "data": {
           "weekday_window": "Weekdays (HH:MM-HH:MM)",
-          "weekend_window": "Weekend (HH:MM-HH:MM)",
-          "dnd_window": "Quiet hours (HH:MM-HH:MM)"
+          "weekend_window": "Weekend (HH:MM-HH:MM)"
         }
       },
       "remove_person": {
@@ -89,7 +87,7 @@
       },
       "manage_fallback": {
         "title": "Manage fallback group",
-        "description": "The fallback group is built in and cannot be deleted. Choose the people who should receive notifications when originally selected recipients are skipped because of schedule, quiet hours, or home checks.",
+        "description": "The fallback group is built in and cannot be deleted. Choose the people who should receive notifications when originally selected recipients are skipped because of schedule or home checks.",
         "data": {
           "group_members": "Fallback people"
         }
@@ -156,7 +154,7 @@
         },
         "type": {
           "name": "Type",
-          "description": "Delivery type. Critical bypasses schedule, DND, and home checks."
+          "description": "Delivery type. Critical bypasses schedule and home checks."
         },
         "target": {
           "name": "Recipients",
