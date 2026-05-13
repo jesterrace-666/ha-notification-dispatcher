@@ -64,7 +64,7 @@
       },
       "add_group": {
         "title": "Add group",
-        "description": "The all/alle target always exists. Use groups for additional reusable recipient sets such as Family or Parents.",
+        "description": "The all/alle target always exists. There is also a built-in Fallback group for rerouted notifications. Use groups for additional reusable recipient sets such as Family or Parents.",
         "data": {
           "name": "Group name",
           "group_members": "People"
@@ -78,7 +78,7 @@
       },
       "edit_group_details": {
         "title": "Edit group",
-        "description": "Change the group's name and people. all/alle remains built in and cannot be removed.",
+        "description": "Change this group. all/alle remains built in. The Fallback group is built in and cannot be removed.",
         "data": {
           "name": "Group name",
           "group_members": "People"
@@ -99,7 +99,7 @@
       "missing_group_name": "Enter a group name.",
       "missing_group_members": "Choose at least one person for the group.",
       "duplicate_group": "This group already exists.",
-      "reserved_group_name": "all/alle is built in and cannot be used as a group name.",
+      "reserved_group_name": "all/alle and fallback are built in and cannot be used as group names.",
       "save_failed": "The person could not be saved. Details are available in the Home Assistant log."
     }
   },
