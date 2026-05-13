@@ -17,6 +17,7 @@
         "title": "Notification Dispatcher options",
         "menu_options": {
           "add_person": "Add person",
+          "manage_fallback": "Manage fallback group",
           "edit_person": "Edit person",
           "remove_person": "Remove person",
           "add_group": "Add group",
@@ -69,6 +70,17 @@
           "name": "Group name",
           "group_members": "People"
         }
+      },
+      "manage_fallback": {
+        "title": "Manage fallback group",
+        "description": "The fallback group is built in and cannot be deleted. Choose the people who should receive notifications when originally selected recipients are skipped because of schedule, quiet hours, or home checks.",
+        "data": {
+          "group_members": "Fallback people"
+        }
+      },
+      "manage_fallback_empty": {
+        "title": "Manage fallback group",
+        "description": "Add at least one person first. Then come back here to choose fallback people."
       },
       "edit_group": {
         "title": "Select group",
