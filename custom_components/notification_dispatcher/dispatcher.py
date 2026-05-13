@@ -57,6 +57,8 @@ from .const import (
     DEFAULT_WEEKDAY_WINDOW,
     DEFAULT_WEEKEND_WINDOW,
     NOTIFICATION_TYPES,
+    SYSTEM_GROUP_FALLBACK_ID,
+    SYSTEM_GROUP_FALLBACK_TARGET_KEY,
     TARGET_ALL,
     TYPE_CRITICAL,
     TYPE_INFO,
@@ -77,6 +79,15 @@ TYPE_ICONS = {
 SCOPE_ICON_ALL = "🌐"
 SCOPE_ICON_GROUP = "👥"
 SCOPE_ICON_PERSONAL = "👤"
+FALLBACK_TITLE_PREFIX = "🔁 Fallback"
+FALLBACK_DELIVERY_REASONS = {
+    "person_not_home",
+    "weekday_disabled",
+    "outside_weekday_window",
+    "weekend_disabled",
+    "outside_weekend_window",
+    "dnd_active",
+}
 
 
 @dataclass(frozen=True)
@@ -134,6 +145,8 @@ class NotificationDispatcher:
             "failed": [],
             "persistent": [],
         }
+        fallback_required = False
+        delivered_profile_ids: set[str] = set()
 
         if (
             notification_type in {TYPE_WARNING, TYPE_CRITICAL}
@@ -161,6 +174,8 @@ class NotificationDispatcher:
                 result["skipped"].append(
                     {"profile": _profile_name(profile), "reason": decision.reason}
                 )
+                if decision.reason in FALLBACK_DELIVERY_REASONS:
+                    fallback_required = True
                 continue
 
             payload_data = _deep_merge(
@@ -173,6 +188,21 @@ class NotificationDispatcher:
                 title=title,
                 message=message,
                 payload_data=payload_data,
+                dry_run=dry_run,
+                continue_on_error=continue_on_error,
+            )
+            profile_id = str(profile.get(CONF_PROFILE_ID, "")).strip()
+            if profile_id:
+                delivered_profile_ids.add(profile_id)
+
+        if fallback_required and notification_type != TYPE_CRITICAL:
+            await self._async_send_fallback(
+                result=result,
+                delivered_profile_ids=delivered_profile_ids,
+                title=title,
+                message=message,
+                notification_type=notification_type,
+                extra_data=extra_data,
                 dry_run=dry_run,
                 continue_on_error=continue_on_error,
             )
@@ -380,6 +410,70 @@ class NotificationDispatcher:
             else:
                 sent = {"profile": _profile_name(profile), "target": target}
                 result["sent"].append(sent)
+
+    async def _async_send_fallback(
+        self,
+        *,
+        result: dict[str, list[dict[str, Any]]],
+        delivered_profile_ids: set[str],
+        title: str,
+        message: str,
+        notification_type: str,
+        extra_data: dict[str, Any],
+        dry_run: bool,
+        continue_on_error: bool,
+    ) -> None:
+        """Send skipped notifications to the built-in fallback group."""
+        fallback_profiles = self._fallback_profiles(delivered_profile_ids)
+        if not fallback_profiles:
+            result["skipped"].append({"profile": "Fallback", "reason": "fallback_empty"})
+            return
+
+        fallback_title = _fallback_title(title)
+        payload_data = _deep_merge(
+            _default_payload_data(notification_type),
+            extra_data,
+        )
+        for profile in fallback_profiles:
+            await self._async_send_profile(
+                result=result,
+                profile=profile,
+                title=fallback_title,
+                message=message,
+                payload_data=payload_data,
+                dry_run=dry_run,
+                continue_on_error=continue_on_error,
+            )
+
+    def _fallback_profiles(self, delivered_profile_ids: set[str]) -> list[dict[str, Any]]:
+        """Return fallback profiles except recipients that already got the message."""
+        fallback_member_ids = self._fallback_member_ids()
+        if not fallback_member_ids:
+            return []
+
+        fallback_profiles: list[dict[str, Any]] = []
+        for profile in _ensure_mapping_list(self.entry.options.get(CONF_PROFILES, [])):
+            profile_id = str(profile.get(CONF_PROFILE_ID, "")).strip()
+            if not profile_id:
+                continue
+            if profile_id in delivered_profile_ids:
+                continue
+            if profile_id in fallback_member_ids:
+                fallback_profiles.append(profile)
+
+        return fallback_profiles
+
+    def _fallback_member_ids(self) -> set[str]:
+        """Return configured member ids of the built-in fallback group."""
+        for group in _ensure_mapping_list(self.entry.options.get(CONF_GROUPS, [])):
+            if not _is_fallback_group(group):
+                continue
+            return {
+                str(member_id)
+                for member_id in _ensure_list(group.get(CONF_GROUP_MEMBERS))
+                if str(member_id).strip()
+            }
+        return set()
 
     async def _async_send_to_target(
         self,
@@ -625,6 +719,13 @@ def _format_title(notification_type: str, title: Any, scope_prefix: str) -> str:
     return f"{scope_prefix} {icon}"
 
 
+def _fallback_title(title: str) -> str:
+    """Mark a fallback reroute in the notification title."""
+    if title.startswith(FALLBACK_TITLE_PREFIX):
+        return title
+    return f"{FALLBACK_TITLE_PREFIX} {title}".strip()
+
+
 def _recipient_scope_prefix(
     entry: ConfigEntry,
     target_keys: list[str],
@@ -658,6 +759,16 @@ def _matched_group_names(entry: ConfigEntry, requested_keys: set[str]) -> list[s
         if name not in names:
             names.append(name)
     return names
+
+
+def _is_fallback_group(group: dict[str, Any]) -> bool:
+    """Return whether a group is the built-in fallback group."""
+    group_id = str(group.get(CONF_GROUP_ID, "")).strip()
+    if group_id == SYSTEM_GROUP_FALLBACK_ID:
+        return True
+
+    target_key = _normalize_target_key(group.get(CONF_TARGET_KEY))
+    return target_key == SYSTEM_GROUP_FALLBACK_TARGET_KEY
 
 
 def _matched_profile_names(entry: ConfigEntry, requested_keys: set[str]) -> list[str]:
