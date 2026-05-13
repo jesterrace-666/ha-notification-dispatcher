@@ -33,18 +33,22 @@ jobs:
           )
           echo "value=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Ensure version has no existing tag
+      - name: Check existing release tag
+        id: tag_check
         shell: bash
         run: |
           VERSION="${{ steps.version.outputs.value }}"
           git fetch --tags --force
           if git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then
-            echo "Version v$VERSION already exists. Bump manifest.json version before pushing."
-            exit 1
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Tag v$VERSION already exists - skipping release creation."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Build release name
         id: release_name
+        if: steps.tag_check.outputs.exists == 'false'
         shell: bash
         run: |
           VERSION="${{ steps.version.outputs.value }}"
@@ -54,7 +58,8 @@ jobs:
             echo "value=v$VERSION" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Create or update release
+      - name: Create release
+        if: steps.tag_check.outputs.exists == 'false'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.version.outputs.value }}
