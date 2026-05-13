@@ -17,3 +17,8 @@ data:
 ```
 
 After installing through HACS, restart Home Assistant and add **Notification Dispatcher** from **Settings > Devices & services**.
+
+Built-in groups:
+
+- `all/alle` (non-removable)
+- `fallback` (non-removable): receives rerouted notifications when originally selected recipients are skipped because of schedule, DND, or home checks.
