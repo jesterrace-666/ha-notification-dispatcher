@@ -25,11 +25,19 @@ from .const import (
     ATTR_TYPE,
     BUILD_CODENAME,
     BUILD_SERIES,
+    CONF_GROUP_ID,
+    CONF_GROUP_MEMBERS,
+    CONF_GROUPS,
+    CONF_NAME,
+    CONF_TARGET_KEY,
     DEFAULT_NOTIFICATION_TYPE,
     DOMAIN,
     NAME,
     NOTIFICATION_TYPES,
     SERVICE_SEND,
+    SYSTEM_GROUP_FALLBACK_ID,
+    SYSTEM_GROUP_FALLBACK_NAME,
+    SYSTEM_GROUP_FALLBACK_TARGET_KEY,
 )
 from .dispatcher import NotificationDispatcher
 
@@ -90,8 +98,13 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Notification Dispatcher from a config entry."""
-    if entry.title != NAME:
-        hass.config_entries.async_update_entry(entry, title=NAME)
+    normalized_options = _normalized_options(entry.options)
+    if entry.title != NAME or normalized_options != entry.options:
+        hass.config_entries.async_update_entry(
+            entry,
+            title=NAME,
+            options=normalized_options,
+        )
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = NotificationDispatcher(
         hass, entry
@@ -152,3 +165,78 @@ def _normalize_call_data(call_data: dict[str, Any]) -> dict[str, Any]:
     )
     normalized.pop(ATTR_DATA, None)
     return normalized
+
+
+def _normalized_options(options: dict[str, Any]) -> dict[str, Any]:
+    """Normalize entry options and ensure built-in groups exist."""
+    normalized = dict(options)
+    groups = _coerce_mapping_list(normalized.get(CONF_GROUPS, []))
+    normalized[CONF_GROUPS] = _ensure_system_groups(groups)
+    return normalized
+
+
+def _coerce_mapping_list(value: Any) -> list[dict[str, Any]]:
+    """Return options as a list of dict items."""
+    if isinstance(value, dict):
+        raw_items: list[Any] = list(value.values())
+    elif isinstance(value, list):
+        raw_items = value
+    else:
+        raw_items = []
+
+    items: list[dict[str, Any]] = []
+    for item in raw_items:
+        if isinstance(item, dict):
+            items.append(item)
+    return items
+
+
+def _ensure_system_groups(groups: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Ensure the non-removable fallback group exists."""
+    normalized_groups: list[dict[str, Any]] = []
+    fallback_members: list[str] = []
+
+    for group in groups:
+        if _is_fallback_group(group):
+            fallback_members = [
+                str(member)
+                for member in group.get(CONF_GROUP_MEMBERS, [])
+                if str(member).strip()
+            ]
+            continue
+        normalized_groups.append(group)
+
+    normalized_groups.append(
+        {
+            CONF_GROUP_ID: SYSTEM_GROUP_FALLBACK_ID,
+            CONF_NAME: SYSTEM_GROUP_FALLBACK_NAME,
+            CONF_TARGET_KEY: SYSTEM_GROUP_FALLBACK_TARGET_KEY,
+            CONF_GROUP_MEMBERS: fallback_members,
+        }
+    )
+    return normalized_groups
+
+
+def _is_fallback_group(group: dict[str, Any]) -> bool:
+    """Return whether a group is the built-in fallback group."""
+    if str(group.get(CONF_GROUP_ID, "")).strip() == SYSTEM_GROUP_FALLBACK_ID:
+        return True
+
+    target_key = (
+        str(group.get(CONF_TARGET_KEY, ""))
+        .strip()
+        .casefold()
+        .replace(" ", "_")
+        .replace("-", "_")
+    )
+    if target_key == SYSTEM_GROUP_FALLBACK_TARGET_KEY:
+        return True
+
+    group_name = (
+        str(group.get(CONF_NAME, ""))
+        .strip()
+        .casefold()
+        .replace(" ", "_")
+        .replace("-", "_")
+    )
+    return group_name == SYSTEM_GROUP_FALLBACK_TARGET_KEY
