@@ -32,11 +32,18 @@
           "person_entity_id": "Person",
           "notify_targets": "Mobile-App-Ziele",
           "enabled_types": "Zusaetzliche Nachrichtentypen",
+          "always_notify": "Rund um die Uhr zustellen",
           "member_groups": "Gruppen",
-          "only_when_home": "Nur wenn zuhause",
-          "weekday_window": "Werktage",
-          "weekend_window": "Wochenende",
-          "dnd_window": "Ruhezeit"
+          "only_when_home": "Nur wenn zuhause"
+        }
+      },
+      "add_person_schedule": {
+        "title": "Zeitfenster setzen",
+        "description": "Trage Zeitfenster als HH:MM-HH:MM ein, zum Beispiel 08:00-22:00.",
+        "data": {
+          "weekday_window": "Werktage (HH:MM-HH:MM)",
+          "weekend_window": "Wochenende (HH:MM-HH:MM)",
+          "dnd_window": "Ruhezeit (HH:MM-HH:MM)"
         }
       },
       "edit_person": {
@@ -52,11 +59,18 @@
           "person_entity_id": "Person",
           "notify_targets": "Mobile-App-Ziele",
           "enabled_types": "Zusaetzliche Nachrichtentypen",
+          "always_notify": "Rund um die Uhr zustellen",
           "member_groups": "Gruppen",
-          "only_when_home": "Nur wenn zuhause",
-          "weekday_window": "Werktage",
-          "weekend_window": "Wochenende",
-          "dnd_window": "Ruhezeit"
+          "only_when_home": "Nur wenn zuhause"
+        }
+      },
+      "edit_details_schedule": {
+        "title": "Zeitfenster bearbeiten",
+        "description": "Trage Zeitfenster als HH:MM-HH:MM ein, zum Beispiel 08:00-22:00.",
+        "data": {
+          "weekday_window": "Werktage (HH:MM-HH:MM)",
+          "weekend_window": "Wochenende (HH:MM-HH:MM)",
+          "dnd_window": "Ruhezeit (HH:MM-HH:MM)"
         }
       },
       "remove_person": {
