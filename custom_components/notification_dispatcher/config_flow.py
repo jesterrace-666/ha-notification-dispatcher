@@ -33,9 +33,6 @@ from .config_flow_helpers import (
 )
 from .const import (
     CONF_ALWAYS_NOTIFY,
-    CONF_DND_END,
-    CONF_DND_START,
-    CONF_DND_WINDOW,
     CONF_GROUP_ID,
     CONF_GROUPS,
     CONF_NAME,
@@ -47,7 +44,6 @@ from .const import (
     CONF_WEEKEND_END,
     CONF_WEEKEND_START,
     CONF_WEEKEND_WINDOW,
-    DEFAULT_DND_WINDOW,
     DEFAULT_WEEKDAY_WINDOW,
     DEFAULT_WEEKEND_WINDOW,
     DOMAIN,
@@ -321,11 +317,6 @@ class NotificationDispatcherOptionsFlow(config_entries.OptionsFlowWithReload):
                             CONF_WEEKEND_WINDOW,
                             DEFAULT_WEEKEND_WINDOW,
                         ),
-                        CONF_DND_WINDOW: _window_from_profile(
-                            profile,
-                            CONF_DND_WINDOW,
-                            DEFAULT_DND_WINDOW,
-                        ),
                     }
                 )
             return await self.async_step_edit_details_schedule()
@@ -598,8 +589,7 @@ def _window_from_profile(profile: dict[str, Any], key: str, default: str) -> str
         start = profile.get(CONF_WEEKEND_START)
         end = profile.get(CONF_WEEKEND_END)
     else:
-        start = profile.get(CONF_DND_START)
-        end = profile.get(CONF_DND_END)
+        return default
 
     if start and end:
         return f"{_window_time_str(start)}-{_window_time_str(end)}"
