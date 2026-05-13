@@ -103,7 +103,7 @@ class NotificationDispatcherOptionsFlow(config_entries.OptionsFlowWithReload):
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None):
         """Show the options menu."""
-        menu_options = ["add_person"]
+        menu_options = ["add_person", "manage_fallback"]
         if self._profiles:
             menu_options.extend(
                 ["edit_person", "remove_person", "add_group", "edit_group"]
@@ -112,6 +112,46 @@ class NotificationDispatcherOptionsFlow(config_entries.OptionsFlowWithReload):
             menu_options.append("remove_group")
 
         return self.async_show_menu(step_id="init", menu_options=menu_options)
+
+    async def async_step_manage_fallback(
+        self, user_input: dict[str, Any] | None = None
+    ):
+        """Manage members of the built-in fallback group."""
+        if not self._profiles:
+            return await self.async_step_manage_fallback_empty(user_input)
+
+        fallback_group = _fallback_group_from_groups(self._groups)
+        if user_input is not None:
+            updated_fallback = _group_from_user_input(
+                user_input,
+                existing=fallback_group,
+            )
+            groups = [
+                updated_fallback if _is_fallback_group(group) else group
+                for group in self._groups
+            ]
+            return self.async_create_entry(data=self._updated_options(groups=groups))
+
+        return self.async_show_form(
+            step_id="manage_fallback",
+            data_schema=_group_schema(
+                self._profiles,
+                fallback_group,
+                allow_name_edit=False,
+            ),
+        )
+
+    async def async_step_manage_fallback_empty(
+        self, user_input: dict[str, Any] | None = None
+    ):
+        """Show an informational fallback step when no people exist yet."""
+        if user_input is not None:
+            return await self.async_step_init()
+
+        return self.async_show_form(
+            step_id="manage_fallback_empty",
+            data_schema=vol.Schema({}),
+        )
 
     async def async_step_add_person(self, user_input: dict[str, Any] | None = None):
         """Add a person profile."""
@@ -155,7 +195,12 @@ class NotificationDispatcherOptionsFlow(config_entries.OptionsFlowWithReload):
             data_schema=vol.Schema(
                 {
                     vol.Required(CONF_PROFILE_ID): SelectSelector(
-                        SelectSelectorConfig(options=_profile_select_options(self._profiles))
+                        SelectSelectorConfig(
+                            options=_profile_select_options(
+                                self._profiles,
+                                self._groups,
+                            )
+                        )
                     )
                 }
             ),
@@ -232,7 +277,12 @@ class NotificationDispatcherOptionsFlow(config_entries.OptionsFlowWithReload):
             data_schema=vol.Schema(
                 {
                     vol.Required(CONF_PROFILE_ID): SelectSelector(
-                        SelectSelectorConfig(options=_profile_select_options(self._profiles))
+                        SelectSelectorConfig(
+                            options=_profile_select_options(
+                                self._profiles,
+                                self._groups,
+                            )
+                        )
                     )
                 }
             ),
@@ -551,25 +601,33 @@ def _profile_errors(
     return errors
 
 
-def _profile_select_options(profiles: list[dict[str, Any]]) -> list[dict[str, str]]:
+def _profile_select_options(
+    profiles: list[dict[str, Any]],
+    groups: list[dict[str, Any]] | None = None,
+) -> list[dict[str, str]]:
     """Build select options for profiles."""
+    groups = groups or []
     return [
         {
             "value": profile[CONF_PROFILE_ID],
-            "label": _profile_label(profile),
+            "label": _profile_label(profile, groups),
         }
         for profile in profiles
     ]
 
 
-def _profile_label(profile: dict[str, Any]) -> str:
+def _profile_label(profile: dict[str, Any], groups: list[dict[str, Any]]) -> str:
     """Return a human readable profile label."""
     name = profile.get(CONF_NAME) or profile.get(CONF_PERSON_ENTITY_ID) or "Person"
+    profile_id = str(profile.get(CONF_PROFILE_ID, "")).strip()
+    memberships = _profile_group_memberships(groups, profile_id)
     targets = profile.get(CONF_NOTIFY_TARGETS, [])
     target_count = len(targets) if isinstance(targets, list) else 1
-    if target_count <= 1:
-        return str(name)
-    return f"{name} ({target_count} Ziele)"
+    if target_count > 1:
+        name = f"{name} ({target_count} Ziele)"
+    if memberships:
+        return f"{name} - Gruppen: {', '.join(memberships)}"
+    return str(name)
 
 
 def _group_schema(
@@ -704,6 +762,14 @@ def _group_without_member(group: dict[str, Any], profile_id: str) -> dict[str, A
     return updated_group
 
 
+def _fallback_group_from_groups(groups: list[dict[str, Any]]) -> dict[str, Any]:
+    """Return the built-in fallback group from configured groups."""
+    for group in groups:
+        if _is_fallback_group(group):
+            return _fallback_group(group)
+    return _fallback_group()
+
+
 def _fallback_group(existing: dict[str, Any] | None = None) -> dict[str, Any]:
     """Return the built-in fallback group."""
     existing = existing or {}
@@ -742,6 +808,30 @@ def _is_fallback_group(group: dict[str, Any]) -> bool:
 
     group_name = _normalize_target_key(group.get(CONF_NAME))
     return group_name == SYSTEM_GROUP_FALLBACK_TARGET_KEY
+
+
+def _profile_group_memberships(
+    groups: list[dict[str, Any]],
+    profile_id: str,
+) -> list[str]:
+    """Return group names a profile belongs to."""
+    if not profile_id:
+        return []
+
+    memberships: list[str] = []
+    for group in groups:
+        members = [str(member) for member in _ensure_list(group.get(CONF_GROUP_MEMBERS))]
+        if profile_id not in members:
+            continue
+        if _is_fallback_group(group):
+            memberships.append(SYSTEM_GROUP_FALLBACK_NAME)
+            continue
+        group_name = str(group.get(CONF_NAME) or "").strip()
+        if group_name:
+            memberships.append(group_name)
+
+    memberships.sort(key=str.casefold)
+    return memberships
 
 
 def _person_name(hass: HomeAssistant, person_entity_id: str) -> str:
