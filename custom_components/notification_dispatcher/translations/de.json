@@ -64,7 +64,7 @@
       },
       "add_group": {
         "title": "Gruppe hinzufuegen",
-        "description": "Das Ziel alle/all ist immer vorhanden. Hier kannst du zusaetzliche Gruppen aus deinen Personen bauen, zum Beispiel Familie oder Eltern.",
+        "description": "Das Ziel alle/all ist immer vorhanden. Zusaetzlich gibt es die fest eingebaute Gruppe Fallback fuer Umleitungen. Hier kannst du weitere Gruppen aus deinen Personen bauen, zum Beispiel Familie oder Eltern.",
         "data": {
           "name": "Gruppenname",
           "group_members": "Personen"
@@ -78,7 +78,7 @@
       },
       "edit_group_details": {
         "title": "Gruppe bearbeiten",
-        "description": "Passe Name und Personen dieser Gruppe an. alle/all bleibt automatisch vorhanden und kann nicht entfernt werden.",
+        "description": "Passe diese Gruppe an. alle/all bleibt automatisch vorhanden. Die Gruppe Fallback ist fest eingebaut und nicht loeschbar.",
         "data": {
           "name": "Gruppenname",
           "group_members": "Personen"
@@ -99,7 +99,7 @@
       "missing_group_name": "Gib einen Gruppennamen ein.",
       "missing_group_members": "Waehle mindestens eine Person fuer die Gruppe aus.",
       "duplicate_group": "Diese Gruppe gibt es bereits.",
-      "reserved_group_name": "alle/all ist fest eingebaut und kann nicht als Gruppe verwendet werden.",
+      "reserved_group_name": "all/alle und fallback sind fest eingebaut und koennen nicht als Gruppenname verwendet werden.",
       "save_failed": "Die Person konnte nicht gespeichert werden. Details stehen im Home-Assistant-Log."
     }
   },
