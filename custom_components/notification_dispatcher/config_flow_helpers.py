@@ -23,9 +23,6 @@ from .const import (
     CONF_ALWAYS_NOTIFY,
     CONF_ALLOW_WEEKDAYS,
     CONF_ALLOW_WEEKENDS,
-    CONF_DND_ENABLED,
-    CONF_DND_END,
-    CONF_DND_START,
     CONF_DND_WINDOW,
     CONF_ENABLED_TYPES,
     CONF_GROUP_ID,
@@ -42,7 +39,6 @@ from .const import (
     CONF_WEEKEND_END,
     CONF_WEEKEND_START,
     CONF_WEEKEND_WINDOW,
-    DEFAULT_DND_WINDOW,
     DEFAULT_WEEKDAY_WINDOW,
     DEFAULT_WEEKEND_WINDOW,
     OPTIONAL_NOTIFICATION_TYPES,
@@ -179,17 +175,6 @@ def _profile_schedule_schema_fields(profile: dict[str, Any]) -> dict[Any, Any]:
                 DEFAULT_WEEKEND_WINDOW,
             ),
         ): TextSelector(),
-        vol.Optional(
-            CONF_DND_WINDOW,
-            default=_window_from_profile(
-                profile,
-                CONF_DND_WINDOW,
-                CONF_DND_ENABLED,
-                CONF_DND_START,
-                CONF_DND_END,
-                DEFAULT_DND_WINDOW,
-            ),
-        ): TextSelector(),
     }
 
 
@@ -232,20 +217,10 @@ def _profile_from_user_input(
         CONF_WEEKEND_END,
         DEFAULT_WEEKEND_WINDOW,
     )
-    dnd_window = _window_from_form_or_existing(
-        user_input,
-        existing,
-        CONF_DND_WINDOW,
-        CONF_DND_ENABLED,
-        CONF_DND_START,
-        CONF_DND_END,
-        DEFAULT_DND_WINDOW,
-    )
     always_notify = bool(user_input.get(CONF_ALWAYS_NOTIFY, False))
     if always_notify:
         weekday_window = "00:00-23:59"
         weekend_window = "00:00-23:59"
-        dnd_window = ""
 
     return {
         CONF_PROFILE_ID: existing.get(CONF_PROFILE_ID, uuid4().hex),
@@ -269,11 +244,9 @@ def _profile_from_user_input(
             DEFAULT_WEEKEND_WINDOW,
             CONF_WEEKEND_WINDOW,
         ),
-        CONF_DND_WINDOW: _normalize_time_window(
-            dnd_window,
-            DEFAULT_DND_WINDOW,
-            CONF_DND_WINDOW,
-        ),
+        # Quiet hours input was removed from the UI.
+        # Keep this key empty to disable hidden DND blocking.
+        CONF_DND_WINDOW: "",
     }
 
 
