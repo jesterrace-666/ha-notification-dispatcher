@@ -59,6 +59,7 @@ from .const import (
 
 _WINDOW_SPLITTER = re.compile(r"\s*(?:-|\bbis\b|\bto\b)\s*", re.IGNORECASE)
 TARGET_ALL_ALIASES = {"all", "alle"}
+CONF_MEMBER_GROUPS = "member_groups"
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -168,9 +169,20 @@ class NotificationDispatcherOptionsFlow(config_entries.OptionsFlowWithReload):
                 try:
                     errors = _profile_errors(self._profiles, profile)
                     if not errors:
+                        selected_group_ids = _group_ids_from_input(
+                            user_input.get(CONF_MEMBER_GROUPS, [])
+                        )
                         profiles = [*self._profiles, profile]
+                        groups = _apply_profile_group_memberships(
+                            self._groups,
+                            profile[CONF_PROFILE_ID],
+                            selected_group_ids,
+                        )
                         return self.async_create_entry(
-                            data=self._updated_options(profiles=profiles)
+                            data=self._updated_options(
+                                profiles=profiles,
+                                groups=groups,
+                            )
                         )
                 except Exception:
                     _LOGGER.exception(
@@ -180,7 +192,10 @@ class NotificationDispatcherOptionsFlow(config_entries.OptionsFlowWithReload):
 
         return self.async_show_form(
             step_id="add_person",
-            data_schema=_profile_schema(self.hass),
+            data_schema=_profile_schema(
+                self.hass,
+                self._groups,
+            ),
             errors=errors,
         )
 
@@ -196,10 +211,7 @@ class NotificationDispatcherOptionsFlow(config_entries.OptionsFlowWithReload):
                 {
                     vol.Required(CONF_PROFILE_ID): SelectSelector(
                         SelectSelectorConfig(
-                            options=_profile_select_options(
-                                self._profiles,
-                                self._groups,
-                            )
+                            options=_profile_select_options(self._profiles)
                         )
                     )
                 }
@@ -233,6 +245,9 @@ class NotificationDispatcherOptionsFlow(config_entries.OptionsFlowWithReload):
                         updated_profile[CONF_PROFILE_ID],
                     )
                     if not errors:
+                        selected_group_ids = _group_ids_from_input(
+                            user_input.get(CONF_MEMBER_GROUPS, [])
+                        )
                         profiles = [
                             updated_profile
                             if item.get(CONF_PROFILE_ID)
@@ -240,8 +255,16 @@ class NotificationDispatcherOptionsFlow(config_entries.OptionsFlowWithReload):
                             else item
                             for item in self._profiles
                         ]
+                        groups = _apply_profile_group_memberships(
+                            self._groups,
+                            updated_profile[CONF_PROFILE_ID],
+                            selected_group_ids,
+                        )
                         return self.async_create_entry(
-                            data=self._updated_options(profiles=profiles)
+                            data=self._updated_options(
+                                profiles=profiles,
+                                groups=groups,
+                            )
                         )
                 except Exception:
                     _LOGGER.exception(
@@ -251,7 +274,11 @@ class NotificationDispatcherOptionsFlow(config_entries.OptionsFlowWithReload):
 
         return self.async_show_form(
             step_id="edit_details",
-            data_schema=_profile_schema(self.hass, profile),
+            data_schema=_profile_schema(
+                self.hass,
+                self._groups,
+                profile,
+            ),
             errors=errors,
         )
 
@@ -278,10 +305,7 @@ class NotificationDispatcherOptionsFlow(config_entries.OptionsFlowWithReload):
                 {
                     vol.Required(CONF_PROFILE_ID): SelectSelector(
                         SelectSelectorConfig(
-                            options=_profile_select_options(
-                                self._profiles,
-                                self._groups,
-                            )
+                            options=_profile_select_options(self._profiles)
                         )
                     )
                 }
@@ -448,6 +472,7 @@ class NotificationDispatcherOptionsFlow(config_entries.OptionsFlowWithReload):
 
 def _profile_schema(
     hass: HomeAssistant,
+    groups: list[dict[str, Any]],
     profile: dict[str, Any] | None = None,
 ) -> vol.Schema:
     """Build the person profile schema."""
@@ -466,66 +491,84 @@ def _profile_schema(
         notify_target_selector = TextSelector()
         notify_target_default = _targets_to_text(profile.get(CONF_NOTIFY_TARGETS, []))
 
-    return vol.Schema(
-        {
-            vol.Required(
-                CONF_PERSON_ENTITY_ID,
-                default=profile.get(CONF_PERSON_ENTITY_ID),
-            ): EntitySelector(EntitySelectorConfig(domain="person")),
-            vol.Required(
-                CONF_NOTIFY_TARGETS,
-                default=notify_target_default,
-            ): notify_target_selector,
-            vol.Optional(
-                CONF_ENABLED_TYPES,
-                default=_optional_enabled_types(
-                    profile.get(CONF_ENABLED_TYPES, [TYPE_INFO])
-                ),
-            ): SelectSelector(
-                SelectSelectorConfig(
-                    options=OPTIONAL_NOTIFICATION_TYPES,
-                    multiple=True,
-                )
+    profile_id = str(profile.get(CONF_PROFILE_ID, "")).strip()
+    member_groups_default = _profile_group_ids(groups, profile_id)
+    group_options = _group_select_options(groups)
+
+    schema: dict[Any, Any] = {
+        vol.Required(
+            CONF_PERSON_ENTITY_ID,
+            default=profile.get(CONF_PERSON_ENTITY_ID),
+        ): EntitySelector(EntitySelectorConfig(domain="person")),
+        vol.Required(
+            CONF_NOTIFY_TARGETS,
+            default=notify_target_default,
+        ): notify_target_selector,
+        vol.Optional(
+            CONF_ENABLED_TYPES,
+            default=_optional_enabled_types(
+                profile.get(CONF_ENABLED_TYPES, [TYPE_INFO])
             ),
-            vol.Optional(
-                CONF_ONLY_WHEN_HOME,
-                default=profile.get(CONF_ONLY_WHEN_HOME, False),
-            ): BooleanSelector(),
-            vol.Optional(
+        ): SelectSelector(
+            SelectSelectorConfig(
+                options=OPTIONAL_NOTIFICATION_TYPES,
+                multiple=True,
+            )
+        ),
+        vol.Optional(
+            CONF_ONLY_WHEN_HOME,
+            default=profile.get(CONF_ONLY_WHEN_HOME, False),
+        ): BooleanSelector(),
+        vol.Optional(
+            CONF_WEEKDAY_WINDOW,
+            default=_window_from_profile(
+                profile,
                 CONF_WEEKDAY_WINDOW,
-                default=_window_from_profile(
-                    profile,
-                    CONF_WEEKDAY_WINDOW,
-                    CONF_ALLOW_WEEKDAYS,
-                    CONF_WEEKDAY_START,
-                    CONF_WEEKDAY_END,
-                    DEFAULT_WEEKDAY_WINDOW,
-                ),
-            ): TextSelector(),
-            vol.Optional(
+                CONF_ALLOW_WEEKDAYS,
+                CONF_WEEKDAY_START,
+                CONF_WEEKDAY_END,
+                DEFAULT_WEEKDAY_WINDOW,
+            ),
+        ): TextSelector(),
+        vol.Optional(
+            CONF_WEEKEND_WINDOW,
+            default=_window_from_profile(
+                profile,
                 CONF_WEEKEND_WINDOW,
-                default=_window_from_profile(
-                    profile,
-                    CONF_WEEKEND_WINDOW,
-                    CONF_ALLOW_WEEKENDS,
-                    CONF_WEEKEND_START,
-                    CONF_WEEKEND_END,
-                    DEFAULT_WEEKEND_WINDOW,
-                ),
-            ): TextSelector(),
-            vol.Optional(
+                CONF_ALLOW_WEEKENDS,
+                CONF_WEEKEND_START,
+                CONF_WEEKEND_END,
+                DEFAULT_WEEKEND_WINDOW,
+            ),
+        ): TextSelector(),
+        vol.Optional(
+            CONF_DND_WINDOW,
+            default=_window_from_profile(
+                profile,
                 CONF_DND_WINDOW,
-                default=_window_from_profile(
-                    profile,
-                    CONF_DND_WINDOW,
-                    CONF_DND_ENABLED,
-                    CONF_DND_START,
-                    CONF_DND_END,
-                    DEFAULT_DND_WINDOW,
-                ),
-            ): TextSelector(),
-        }
-    )
+                CONF_DND_ENABLED,
+                CONF_DND_START,
+                CONF_DND_END,
+                DEFAULT_DND_WINDOW,
+            ),
+        ): TextSelector(),
+    }
+
+    if group_options:
+        schema[
+            vol.Optional(
+                CONF_MEMBER_GROUPS,
+                default=member_groups_default,
+            )
+        ] = SelectSelector(
+            SelectSelectorConfig(
+                options=group_options,
+                multiple=True,
+                mode="list",
+            )
+        )
+
+    return vol.Schema(schema)
 
 
 def _profile_from_user_input(
@@ -603,31 +646,25 @@ def _profile_errors(
 
 def _profile_select_options(
     profiles: list[dict[str, Any]],
-    groups: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, str]]:
     """Build select options for profiles."""
-    groups = groups or []
     return [
         {
             "value": profile[CONF_PROFILE_ID],
-            "label": _profile_label(profile, groups),
+            "label": _profile_label(profile),
         }
         for profile in profiles
     ]
 
 
-def _profile_label(profile: dict[str, Any], groups: list[dict[str, Any]]) -> str:
+def _profile_label(profile: dict[str, Any]) -> str:
     """Return a human readable profile label."""
     name = profile.get(CONF_NAME) or profile.get(CONF_PERSON_ENTITY_ID) or "Person"
-    profile_id = str(profile.get(CONF_PROFILE_ID, "")).strip()
-    memberships = _profile_group_memberships(groups, profile_id)
     targets = profile.get(CONF_NOTIFY_TARGETS, [])
     target_count = len(targets) if isinstance(targets, list) else 1
-    if target_count > 1:
-        name = f"{name} ({target_count} Ziele)"
-    if memberships:
-        return f"{name} - Gruppen: {', '.join(memberships)}"
-    return str(name)
+    if target_count <= 1:
+        return str(name)
+    return f"{name} ({target_count} Ziele)"
 
 
 def _group_schema(
@@ -762,6 +799,59 @@ def _group_without_member(group: dict[str, Any], profile_id: str) -> dict[str, A
     return updated_group
 
 
+def _profile_group_ids(groups: list[dict[str, Any]], profile_id: str) -> list[str]:
+    """Return group ids a profile currently belongs to."""
+    if not profile_id:
+        return []
+
+    group_ids: list[str] = []
+    for group in groups:
+        group_id = str(group.get(CONF_GROUP_ID, "")).strip()
+        if not group_id:
+            continue
+        members = [str(member) for member in _ensure_list(group.get(CONF_GROUP_MEMBERS))]
+        if profile_id in members:
+            group_ids.append(group_id)
+
+    return group_ids
+
+
+def _group_ids_from_input(value: Any) -> list[str]:
+    """Parse group ids from selector input."""
+    group_ids: list[str] = []
+    for raw_group_id in _ensure_list(value):
+        group_id = _selector_value_to_string(raw_group_id).strip()
+        if group_id and group_id not in group_ids:
+            group_ids.append(group_id)
+    return group_ids
+
+
+def _apply_profile_group_memberships(
+    groups: list[dict[str, Any]],
+    profile_id: str,
+    selected_group_ids: list[str],
+) -> list[dict[str, Any]]:
+    """Apply selected group memberships for one profile."""
+    selected_ids = set(selected_group_ids)
+    updated_groups: list[dict[str, Any]] = []
+
+    for group in groups:
+        updated_group = dict(group)
+        group_id = str(group.get(CONF_GROUP_ID, "")).strip()
+        members = [
+            str(member)
+            for member in _ensure_list(group.get(CONF_GROUP_MEMBERS))
+            if str(member).strip()
+        ]
+        members = [member for member in members if member != profile_id]
+        if group_id in selected_ids:
+            members.append(profile_id)
+        updated_group[CONF_GROUP_MEMBERS] = list(dict.fromkeys(members))
+        updated_groups.append(updated_group)
+
+    return updated_groups
+
+
 def _fallback_group_from_groups(groups: list[dict[str, Any]]) -> dict[str, Any]:
     """Return the built-in fallback group from configured groups."""
     for group in groups:
@@ -808,30 +898,6 @@ def _is_fallback_group(group: dict[str, Any]) -> bool:
 
     group_name = _normalize_target_key(group.get(CONF_NAME))
     return group_name == SYSTEM_GROUP_FALLBACK_TARGET_KEY
-
-
-def _profile_group_memberships(
-    groups: list[dict[str, Any]],
-    profile_id: str,
-) -> list[str]:
-    """Return group names a profile belongs to."""
-    if not profile_id:
-        return []
-
-    memberships: list[str] = []
-    for group in groups:
-        members = [str(member) for member in _ensure_list(group.get(CONF_GROUP_MEMBERS))]
-        if profile_id not in members:
-            continue
-        if _is_fallback_group(group):
-            memberships.append(SYSTEM_GROUP_FALLBACK_NAME)
-            continue
-        group_name = str(group.get(CONF_NAME) or "").strip()
-        if group_name:
-            memberships.append(group_name)
-
-    memberships.sort(key=str.casefold)
-    return memberships
 
 
 def _person_name(hass: HomeAssistant, person_entity_id: str) -> str:
