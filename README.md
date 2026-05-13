@@ -16,12 +16,14 @@ Der technische Name bleibt unveraendert:
 - Personenprofile in der Home-Assistant-UI verwalten
 - pro Person eine `person.*` Entitaet und eine oder mehrere vorhandene `notify.*` Ziele auswaehlen
 - fest eingebautes Ziel `all`/`alle`, das alle konfigurierten Personen auswaehlt
+- fest eingebaute, nicht loeschbare Gruppe `Fallback` fuer Umleitungen
 - eigene Gruppen aus Personen anlegen, z.B. `familie`
 - Zustellung nach Typ steuern: `critical`, `warning`, `info`, `reminder`
 - Werktage und Wochenende mit kompakten Zeitfenstern wie `08:00-22:00` versehen
 - DND-Zeit pro Person konfigurieren
 - optional nur zustellen, wenn die Person zuhause ist
 - kritische Nachrichten immer zustellen, unabhaengig von Zeit, DND und Anwesenheit
+- automatische Fallback-Zustellung: wenn ein Ziel wegen Zeitfenster, DND oder Zuhause-Pruefung nicht erreicht wird
 - Icons vor dem Titel und persistente Home-Assistant-Benachrichtigung fuer `warning` und `critical`
 
 Die Action erwartet im Kern:
@@ -62,7 +64,7 @@ Zeitfenster werden kompakt eingetragen:
 
 Ein leeres Werktag- oder Wochenende-Feld bedeutet: an diesen Tagen nicht zustellen. Eine leere Ruhezeit bedeutet: keine DND-Sperre.
 
-Das Ziel `all` bzw. `alle` ist immer vorhanden und kann nicht geloescht werden. Zusaetzlich kannst du in den Optionen Gruppen anlegen. Eine Gruppe wird beim Senden ueber ihren Namen angesprochen, zum Beispiel `familie`.
+Das Ziel `all` bzw. `alle` ist immer vorhanden und kann nicht geloescht werden. Zusaetzlich gibt es die feste Gruppe `fallback`, die nicht geloescht werden kann und fuer automatische Umleitungen genutzt wird. Weitere Gruppen kannst du in den Optionen anlegen, zum Beispiel `familie`.
 
 ## Action nutzen
 
