@@ -21,10 +21,14 @@ from .const import (
     CONF_PROFILE_ID,
     CONF_PROFILES,
     CONF_TARGET_KEY,
+    SYSTEM_TARGET_HOME_ASSISTANT_PERSISTENT_ID,
+    SYSTEM_TARGET_HOME_ASSISTANT_PERSISTENT_KEY,
+    SYSTEM_TARGET_HOME_ASSISTANT_PERSISTENT_NAME,
     TARGET_ALL,
     TARGET_TYPE_ALL,
     TARGET_TYPE_GROUP,
     TARGET_TYPE_PROFILE,
+    TARGET_TYPE_SYSTEM,
 )
 
 
@@ -41,6 +45,15 @@ async def async_setup_entry(
             object_id="all_recipients",
             target_key=TARGET_ALL,
             target_type=TARGET_TYPE_ALL,
+            icon="mdi:account-group",
+        ),
+        DispatcherRecipientSensor(
+            entry_id=entry.entry_id,
+            name=SYSTEM_TARGET_HOME_ASSISTANT_PERSISTENT_NAME,
+            object_id=SYSTEM_TARGET_HOME_ASSISTANT_PERSISTENT_ID,
+            target_key=SYSTEM_TARGET_HOME_ASSISTANT_PERSISTENT_KEY,
+            target_type=TARGET_TYPE_SYSTEM,
+            icon="mdi:bell-badge-outline",
         )
     ]
 
@@ -63,6 +76,7 @@ async def async_setup_entry(
                 target_key=target_key,
                 target_type=TARGET_TYPE_PROFILE,
                 profile_id=profile_id,
+                icon="mdi:account",
             )
         )
 
@@ -85,6 +99,7 @@ async def async_setup_entry(
                 target_key=target_key,
                 target_type=TARGET_TYPE_GROUP,
                 group_id=group_id,
+                icon="mdi:account-multiple",
             )
         )
 
@@ -110,11 +125,13 @@ class DispatcherRecipientSensor(SensorEntity):
         target_type: str,
         profile_id: str | None = None,
         group_id: str | None = None,
+        icon: str = "mdi:account-arrow-right-outline",
     ) -> None:
         """Initialize one dispatcher recipient sensor."""
         self._attr_unique_id = f"{entry_id}_{object_id}"
         self._attr_object_id = object_id
         self._attr_name = name
+        self._attr_icon = icon
 
         attributes: dict[str, Any] = {
             ATTR_DISPATCHER_TARGET_KEY: target_key,
