@@ -5,6 +5,7 @@ from __future__ import annotations
 from copy import deepcopy
 from dataclasses import dataclass
 from datetime import time
+import hashlib
 import logging
 from typing import Any
 
@@ -20,6 +21,7 @@ from .const import (
     ATTR_DRY_RUN,
     ATTR_ENTITY_ID,
     ATTR_MESSAGE,
+    ATTR_NOTIFICATION_ID,
     ATTR_RECIPIENTS,
     ATTR_TARGET,
     ATTR_TARGET_ALL,
@@ -27,6 +29,7 @@ from .const import (
     ATTR_TYPE,
     CONF_ALLOW_WEEKDAYS,
     CONF_ALLOW_WEEKENDS,
+    CONF_ALWAYS_NOTIFY,
     CONF_DND_ENABLED,
     CONF_DND_END,
     CONF_DND_START,
@@ -59,6 +62,7 @@ from .const import (
     NOTIFICATION_TYPES,
     SYSTEM_GROUP_FALLBACK_ID,
     SYSTEM_GROUP_FALLBACK_TARGET_KEY,
+    SYSTEM_TARGET_HOME_ASSISTANT_PERSISTENT_KEY,
     TARGET_ALL,
     TYPE_CRITICAL,
     TYPE_INFO,
@@ -68,6 +72,14 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 TARGET_ALL_ALIASES = {TARGET_ALL, "alle"}
+TARGET_PERSISTENT_ALIASES = {
+    SYSTEM_TARGET_HOME_ASSISTANT_PERSISTENT_KEY,
+    "home_assistant",
+    "system",
+    "permanent_notification",
+    "persistent_notification",
+    "global_notification",
+}
 
 TYPE_ICONS = {
     TYPE_INFO: "ℹ️",
@@ -79,6 +91,7 @@ TYPE_ICONS = {
 SCOPE_ICON_ALL = "🌐"
 SCOPE_ICON_GROUP = "👥"
 SCOPE_ICON_PERSONAL = "👤"
+SCOPE_ICON_SYSTEM = "🖥️"
 FALLBACK_TITLE_PREFIX = "🔁 Fallback"
 FALLBACK_DELIVERY_REASONS = {
     "person_not_home",
@@ -121,8 +134,19 @@ class NotificationDispatcher:
             )
 
         target_keys = _target_keys_from_call(self.hass, call_data, notification_type)
-        profiles = self._select_profiles(target_keys, notification_type)
-        if not profiles:
+        persistent_requested = _persistent_target_requested(target_keys)
+        profile_target_keys = _profile_target_keys(target_keys)
+        profiles = (
+            self._select_profiles(profile_target_keys, notification_type)
+            if profile_target_keys
+            else []
+        )
+
+        should_send_persistent = (
+            notification_type in {TYPE_WARNING, TYPE_CRITICAL}
+            or persistent_requested
+        )
+        if not profiles and not should_send_persistent:
             raise ServiceValidationError("No matching notification profiles configured")
 
         scope_prefix = _recipient_scope_prefix(
@@ -148,25 +172,42 @@ class NotificationDispatcher:
         fallback_required = False
         delivered_profile_ids: set[str] = set()
 
-        if (
-            notification_type in {TYPE_WARNING, TYPE_CRITICAL}
-            and not dry_run
-        ):
+        persistent_notification_id = _persistent_notification_id(
+            notification_type,
+            call_data.get(ATTR_TITLE),
+        )
+        if should_send_persistent and not dry_run:
             try:
                 await self._async_send_persistent_notification(
                     title=title,
                     message=message,
+                    notification_id=persistent_notification_id,
                 )
             except HomeAssistantError as err:
                 result["failed"].append(
-                    {"target": "notify.persistent_notification", "error": str(err)}
+                    {
+                        "target": "persistent_notification.create",
+                        ATTR_NOTIFICATION_ID: persistent_notification_id,
+                        "error": str(err),
+                    }
                 )
                 if not continue_on_error:
                     raise
             else:
                 result["persistent"].append(
-                    {"target": "notify.persistent_notification"}
+                    {
+                        "target": "persistent_notification.create",
+                        ATTR_NOTIFICATION_ID: persistent_notification_id,
+                    }
                 )
+        elif should_send_persistent and dry_run:
+            result["persistent"].append(
+                {
+                    "target": "persistent_notification.create",
+                    ATTR_NOTIFICATION_ID: persistent_notification_id,
+                    "dry_run": True,
+                }
+            )
 
         for profile in profiles:
             decision = self._delivery_decision(profile, notification_type)
@@ -287,6 +328,9 @@ class NotificationDispatcher:
 
         if profile.get(CONF_ONLY_WHEN_HOME, False) and not self._is_home(profile):
             return DeliveryDecision(False, "person_not_home")
+
+        if profile.get(CONF_ALWAYS_NOTIFY, False):
+            return DeliveryDecision(True, "always_notify")
 
         now = dt_util.now()
         now_time = now.time().replace(tzinfo=None)
@@ -528,13 +572,17 @@ class NotificationDispatcher:
         )
 
     async def _async_send_persistent_notification(
-        self, *, title: str, message: str
+        self, *, title: str, message: str, notification_id: str
     ) -> None:
         """Send a persistent Home Assistant notification."""
         await self.hass.services.async_call(
-            "notify",
             "persistent_notification",
-            {"title": title, "message": message},
+            "create",
+            {
+                "title": title,
+                "message": message,
+                ATTR_NOTIFICATION_ID: notification_id,
+            },
             blocking=True,
         )
 
@@ -609,8 +657,12 @@ def _target_keys_from_call(
         for extracted_value in _extract_target_values(raw_value):
             resolved_value = _target_key_from_entity_id(hass, extracted_value)
             target_key = _normalize_target_key(resolved_value)
-            if target_key in {"", *TARGET_ALL_ALIASES}:
-                return [TARGET_ALL]
+            if not target_key:
+                continue
+            if target_key in TARGET_ALL_ALIASES:
+                if TARGET_ALL not in target_keys:
+                    target_keys.append(TARGET_ALL)
+                continue
             if target_key not in target_keys:
                 target_keys.append(target_key)
 
@@ -618,6 +670,34 @@ def _target_keys_from_call(
         raise ServiceValidationError("Select at least one recipient")
 
     return target_keys
+
+
+def _persistent_target_requested(target_keys: list[str]) -> bool:
+    """Return whether the Home Assistant permanent target was requested."""
+    requested_keys = {_normalize_target_key(key) for key in target_keys}
+    return bool(requested_keys & TARGET_PERSISTENT_ALIASES)
+
+
+def _profile_target_keys(target_keys: list[str]) -> list[str]:
+    """Return recipient keys that map to people or groups."""
+    keys: list[str] = []
+    for key in target_keys:
+        normalized_key = _normalize_target_key(key)
+        if not normalized_key or normalized_key in TARGET_PERSISTENT_ALIASES:
+            continue
+        keys.append(key)
+    return keys
+
+
+def _persistent_notification_id(notification_type: str, title: Any) -> str:
+    """Return a deterministic persistent notification id from type and title."""
+    normalized_title = _normalize_target_key(title)
+    if not normalized_title:
+        normalized_title = "notification"
+
+    digest_source = f"{notification_type}|{normalized_title}".encode("utf-8")
+    digest = hashlib.sha1(digest_source).hexdigest()[:10]
+    return f"notification_dispatcher_{notification_type}_{normalized_title[:40]}_{digest}"
 
 
 def _ensure_list(value: Any) -> list[Any]:
@@ -733,17 +813,21 @@ def _recipient_scope_prefix(
 ) -> str:
     """Return a visible title prefix for recipient scope."""
     requested_keys = {_normalize_target_key(key) for key in target_keys}
+    persistent_requested = bool(requested_keys & TARGET_PERSISTENT_ALIASES)
+    recipient_keys = requested_keys - TARGET_PERSISTENT_ALIASES
 
-    if notification_type == TYPE_CRITICAL or requested_keys & TARGET_ALL_ALIASES:
+    if notification_type == TYPE_CRITICAL or recipient_keys & TARGET_ALL_ALIASES:
         return f"{SCOPE_ICON_ALL} Alle"
+    if not recipient_keys and persistent_requested:
+        return f"{SCOPE_ICON_SYSTEM} Home Assistant"
 
-    matched_group_names = _matched_group_names(entry, requested_keys)
+    matched_group_names = _matched_group_names(entry, recipient_keys)
     if matched_group_names:
         if len(matched_group_names) == 1:
             return f"{SCOPE_ICON_GROUP} @{matched_group_names[0]}"
         return f"{SCOPE_ICON_GROUP} Gruppen"
 
-    matched_profile_names = _matched_profile_names(entry, requested_keys)
+    matched_profile_names = _matched_profile_names(entry, recipient_keys)
     if len(matched_profile_names) <= 1:
         return f"{SCOPE_ICON_PERSONAL} Persoenlich"
     return f"{SCOPE_ICON_GROUP} Mehrere"
