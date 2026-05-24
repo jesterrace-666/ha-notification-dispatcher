@@ -158,7 +158,7 @@
         },
         "target": {
           "name": "Recipients",
-          "description": "Select one or more configured dispatcher recipients or groups, including \"Alle\" for all."
+          "description": "Select recipients or groups. Extra target: \"Home Assistant (Dauerhaft)\" to create a persistent HA notification."
         }
       }
     }
