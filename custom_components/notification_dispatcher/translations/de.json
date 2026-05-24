@@ -158,7 +158,7 @@
         },
         "target": {
           "name": "Empfaenger",
-          "description": "Waehle einen oder mehrere konfigurierte Dispatcher-Empfaenger oder Gruppen aus, inklusive \"alle\" fuer alle."
+          "description": "Waehle Empfaenger oder Gruppen. Zusatz-Ziel: \"Home Assistant (Dauerhaft)\" fuer eine permanente Benachrichtigung in HA."
         }
       }
     }
