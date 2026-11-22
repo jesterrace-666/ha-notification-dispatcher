@@ -8,6 +8,16 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  panel:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install browser test driver
+        run: npm install --no-save --package-lock=false --ignore-scripts playwright-core@1.62.1
+      - name: Test desktop and mobile history panel
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
+        run: node --test tests/history-panel.test.cjs
   compile:
     runs-on: ubuntu-latest
     strategy:

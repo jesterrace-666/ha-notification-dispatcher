@@ -7,7 +7,7 @@ const words = {
     info: "Info", warning: "Warnung", critical: "Kritisch", reminder: "Erinnerung",
     sent: "Übergeben", partial: "Teilweise übergeben", blocked: "Nicht zugestellt",
     failed: "Versand fehlgeschlagen", not_attempted: "Versand abgebrochen",
-    person_not_home: "Nur wenn zuhause: Zuhause-Bedingung nicht erfüllt",
+    person_not_home: "Nur zuhause: keine Anwesenheit erkannt",
     weekday_disabled: "Werktags ist keine Zustellung aktiviert",
     weekend_disabled: "Am Wochenende ist keine Zustellung aktiviert",
     outside_weekday_window: "Außerhalb des Werktag-Zeitfensters",
@@ -16,7 +16,7 @@ const words = {
     no_notify_targets: "Kein Benachrichtigungsziel hinterlegt",
     invalid_notify_target: "Ungültiges Benachrichtigungsziel", notify_failed: "Fehler beim Notify-Aufruf",
     fb_sent: "An Fallback übergeben", fb_partial: "Teilweise an Fallback übergeben",
-    fb_already_sent: "Fallback bereits direkt erreicht", fb_empty: "Kein anderer Fallback-Empfänger",
+    fb_already_sent: "Bereits direkt an Fallback übergeben", fb_empty: "Kein anderer Fallback-Empfänger",
     fb_failed: "Fallback-Versand fehlgeschlagen", fb_not_attempted: "Fallback nicht ausgeführt",
     fb_none: "Kein Fallback", untitled: "Ohne Titel",
   },
@@ -165,8 +165,9 @@ class NotificationDispatcherHistory extends HTMLElement {
         const prefix = route.for.length ? "FB: " + route.for.map(name => "@" + name.replace(/\s+/g, "_")).join(" ") + " · " : "";
         body.append(element("div", prefix + w[route.status], "route"));
         const reason = route.reason && route.reason !== "not_attempted" ? w[route.reason] : "";
-        const fb = route.fallback ? w["fb_" + route.fallback] : route.status === "blocked" ? w.fb_none : "";
-        if (reason || fb) body.append(element("div", [reason, fb].filter(Boolean).join(" · "), "detail"));
+        const fb = route.fallback ? w["fb_" + route.fallback] : !route.for.length && route.status !== "sent" ? w.fb_none : "";
+        if (reason) body.append(element("div", reason, "detail"));
+        if (fb) body.append(element("div", fb, "detail"));
       }
       const time = element("time", clock.format(date));
       time.dateTime = row.timestamp;

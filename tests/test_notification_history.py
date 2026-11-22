@@ -214,6 +214,21 @@ class HistoryTests(IsolatedAsyncioTestCase):
         self.assertEqual(len(self.rows("new-account")), 1)
         self.assertEqual(self.rows("mara"), [])
 
+    async def test_device_error_is_private_and_unattempted_recipient_is_distinct(self):
+        @callback
+        def disconnected(call):
+            raise ConnectionError("Transport unavailable")
+
+        self.hass.services.async_register("notify", "offline", disconnected)
+        self.profiles[0]["notify_targets"] = ["notify.offline"]
+        with self.assertRaises(ConnectionError):
+            await self.send(["linda", "mara"], continue_on_error=False)
+        self.assertEqual(self.rows("linda")[0]["routes"][0]["reason"], "notify_failed")
+        self.assertEqual(self.rows("mara")[0]["routes"][0]["status"], "not_attempted")
+        self.assertFalse(self.rows("johannes"))
+        await self.send(["linda", "mara"])
+        self.assertEqual(self.rows("mara")[0]["routes"][0]["status"], "sent")
+
     async def test_last_fifty_persist_across_reload_and_removed_on_delete(self):
         for n in range(52):
             await self.send(title=str(n))

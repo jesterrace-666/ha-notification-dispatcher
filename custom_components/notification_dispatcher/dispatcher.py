@@ -12,7 +12,7 @@ from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.util import dt as dt_util
 
 from .const import (
@@ -206,7 +206,7 @@ class NotificationDispatcher:
                     message=message,
                     notification_id=notification_id,
                 )
-            except HomeAssistantError as err:
+            except Exception as err:
                 result["failed"].append({**delivery, "error": str(err)})
                 if not continue_on_error:
                     raise
@@ -469,7 +469,8 @@ class NotificationDispatcher:
                     message=message,
                     payload_data=payload_data,
                 )
-            except HomeAssistantError as err:
+            except Exception as err:
+                # Notify integrations can also propagate transport or schema errors.
                 route.failed += 1
                 route.reason = "notify_failed"
                 if target == "notify.persistent_notification":
