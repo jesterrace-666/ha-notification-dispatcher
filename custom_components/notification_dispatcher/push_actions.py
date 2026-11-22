@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-import logging
 from secrets import token_hex
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
@@ -71,7 +71,7 @@ def endpoint(hass: HomeAssistant, target: str) -> Endpoint | None:
 def _buttons(
     device: Endpoint, language: str, data: dict, *, menu: bool = False
 ) -> tuple[dict, dict] | None:
-    if device.os not in {"android", "ios", "ipados"}:
+    if device.os not in {"android", "ios", "ipados", "iphone os"}:
         return None
     existing = [] if menu else data.get("actions", [])
     if not isinstance(existing, list):
@@ -148,7 +148,12 @@ class PushActions:
         self, route: Delivery, target: str, title: str, message: str, data: dict
     ) -> bool:
         """Return False to use the unchanged non-actionable notify path."""
-        if self._closed or not route.owner or not _is_notification(message):
+        if (
+            self._closed
+            or not route.owner
+            or not route.profile.get(CONF_PROFILE_ID)
+            or not _is_notification(message)
+        ):
             return False
         device = endpoint(self.hass, target)
         if device is None or device.owner != route.owner:
@@ -199,7 +204,7 @@ class PushActions:
                     if verb == "read":
                         push["read"] = True
                         push.pop("pending", None)
-                    elif ticket.get("used"):
+                    elif ticket.get("used") or push.get("pending"):
                         return
                     elif verb == "menu":
                         ticket["used"] = True
@@ -247,6 +252,8 @@ class PushActions:
                 return
             try:
                 for owner, row, push in list(self.history.receipts()):
+                    if self._closed:
+                        break
                     pending = push.get("pending")
                     if not pending or datetime.fromisoformat(pending["at"]) > now:
                         continue
@@ -255,6 +262,9 @@ class PushActions:
                     push["repeat"] = "interrupted"
                     await self.history.async_flush()
                     if self._closed:
+                        # A clean unload can safely restore an unstarted send.
+                        push["pending"] = pending
+                        push.pop("repeat", None)
                         break
                     await self._reissue(owner, row, push, pending["target"], menu=False)
                     self.history.changed()
@@ -283,8 +293,12 @@ class PushActions:
         payload, ticket = prepared
         try:
             await self._send(device, push["title"], row["message"], payload)
-        except Exception:  # Notify integrations may raise transport-specific errors.
-            _LOGGER.warning("Personal reminder notify call failed for %s", target)
+        except Exception as err:  # noqa: BLE001 - isolate notify transport failures
+            _LOGGER.warning(
+                "Personal reminder notify call failed for %s (%s)",
+                target,
+                type(err).__name__,
+            )
             push.update(repeat="failed", repeat_reason="notify_failed")
         else:
             push["devices"][target] = ticket

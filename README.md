@@ -20,7 +20,7 @@ Der technische Name bleibt unveraendert:
 - eigene Gruppen aus Personen anlegen, z.B. `familie`
 - Zustellung nach Typ steuern: `critical`, `warning`, `info`, `reminder`
 - Werktage und Wochenende mit kompakten Zeitfenstern wie `08:00-22:00` versehen
-- DND-Zeit pro Person konfigurieren
+- alternativ rund um die Uhr zustellen; gespeicherte Ruhezeiten berücksichtigen
 - optional nur zustellen, wenn die Person zuhause ist
 - kritische Nachrichten immer zustellen, unabhaengig von Zeit, DND und Anwesenheit
 - automatische Fallback-Zustellung: wenn ein Ziel wegen Zeitfenster, DND oder Zuhause-Pruefung nicht erreicht wird
@@ -49,7 +49,7 @@ Ab **1.7.0 Herald** kannst du eine Dispatcher-Mitteilung auf dem iPhone gedrück
 - **Gelesen** markiert nur deinen Eintrag im Notification Verlauf und storniert eine dafür vorgemerkte Erinnerung. Die gemeinsame HA-Systemmeldung und die Nachrichten anderer Personen bleiben unverändert.
 - Die Erinnerung geht nur an das Gerät, auf dem du die Zeit gewählt hast. Bei Fälligkeit prüft der Dispatcher deine **aktuellen** Einstellungen: Nachrichtentyp, Anwesenheit, Wochentag und Zeitfenster sowie eine gegebenenfalls aktive Ruhezeit. Wird die Erinnerung blockiert, steht der Grund in deinem Verlauf. Es gibt dabei weder eine Weiterleitung an Fallback noch einen weiteren Systemeintrag.
 - Eine **neue kritische Meldung** geht wie bisher sofort an alle. Eine selbst bestellte Wiederholung derselben Meldung berücksichtigt dagegen die persönlichen Zeit- und Ortsregeln.
-- Voraussetzung für die Tasten: Die HA-Person und die Companion-App auf dem Zielgerät sind mit demselben HA-Benutzerkonto verknüpft. Andere Notify-Ziele funktionieren unverändert. Eigene Push-Aktionen belegen zuerst die verfügbaren Plätze. Bereits vorgemerkte Erinnerungen überstehen einen HA-Neustart.
+- Voraussetzung für die Tasten: Die HA-Person und die Companion-App auf dem Zielgerät sind mit demselben HA-Benutzerkonto verknüpft. Andere Notify-Ziele funktionieren unverändert. Eigene Push-Aktionen belegen zuerst die verfügbaren Plätze. Die Tasten gelten für die letzten 50 Nachrichten im persönlichen Verlauf. Bereits vorgemerkte Erinnerungen bleiben auch darüber hinaus und über einen HA-Neustart hinweg erhalten.
 
 ## Installation
 
@@ -78,9 +78,8 @@ Zeitfenster werden kompakt eingetragen:
 
 - Werktage: `08:00-22:00`
 - Wochenende: `09:00-22:00`
-- Ruhezeit/DND: `22:00-07:00`
 
-Ein leeres Werktag- oder Wochenende-Feld bedeutet: an diesen Tagen nicht zustellen. Eine leere Ruhezeit bedeutet: keine DND-Sperre.
+Ein leeres Werktag- oder Wochenende-Feld bedeutet: an diesen Tagen nicht zustellen. Für **24/7** musst du keine Uhrzeiten eintragen. Eine in älteren Profilen ausdrücklich hinterlegte Ruhezeit wird beim Versand ebenfalls geprüft.
 
 Das Ziel `all` bzw. `alle` ist immer vorhanden und kann nicht geloescht werden. Zusaetzlich gibt es die feste Gruppe `fallback`, die nicht geloescht werden kann und fuer automatische Umleitungen genutzt wird. Weitere Gruppen kannst du in den Optionen anlegen, zum Beispiel `familie`.
 

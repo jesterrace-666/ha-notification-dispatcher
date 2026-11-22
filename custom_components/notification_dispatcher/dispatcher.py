@@ -172,7 +172,9 @@ class NotificationDispatcher:
             "failed": [],
             "persistent": [],
         }
-        note = DispatchNote(dt_util.utcnow().isoformat(), notification_type, str(raw_title or ""), message)
+        note = DispatchNote(
+            dt_util.utcnow().isoformat(), notification_type, str(raw_title or ""), message
+        )
         # Bind owners before any service awaits; later person/account edits cannot
         # transfer an earlier dispatch to another user's inbox.
         owners = {
@@ -335,7 +337,8 @@ class NotificationDispatcher:
         return member_ids, matched_group_keys
 
     def _delivery_decision(
-        self, profile: dict[str, Any], notification_type: str, *, personal_repeat: bool = False
+        self, profile: dict[str, Any], notification_type: str, *,
+        personal_repeat: bool = False,
     ) -> DeliveryDecision:
         """Decide whether a profile should receive the notification."""
         if notification_type == TYPE_CRITICAL and not personal_repeat:
@@ -349,6 +352,10 @@ class NotificationDispatcher:
             return DeliveryDecision(False, "person_not_home")
 
         if profile.get(CONF_ALWAYS_NOTIFY, False):
+            # New 24/7 profiles have no DND; honor an explicitly stored legacy DND.
+            explicit_dnd = profile.get(CONF_DND_WINDOW) or profile.get(CONF_DND_ENABLED)
+            if explicit_dnd and _in_dnd(profile, dt_util.now().time().replace(tzinfo=None)):
+                return DeliveryDecision(False, "dnd_active")
             return DeliveryDecision(True, "always_notify")
 
         now = dt_util.now()
@@ -382,25 +389,25 @@ class NotificationDispatcher:
             if not _time_in_allowed_window(now_time, *weekend_window):
                 return DeliveryDecision(False, "outside_weekend_window")
 
-        dnd_window = _profile_time_window(
-            profile,
-            CONF_DND_WINDOW,
-            CONF_DND_ENABLED,
-            CONF_DND_START,
-            CONF_DND_END,
-            DEFAULT_DND_WINDOW,
-        )
-        if dnd_window is not None and _time_in_blocked_window(now_time, *dnd_window):
+        if _in_dnd(profile, now_time):
             return DeliveryDecision(False, "dnd_active")
 
         return DeliveryDecision(True, "matched")
 
-    def personal_push_denial(self, push: dict, owner: str, kind: str, target: str) -> str | None:
+    def personal_push_denial(
+        self, push: dict, owner: str, kind: str, target: str
+    ) -> str | None:
         """Re-evaluate the current profile, never re-expand a group or invoke fallback."""
-        profile = next((p for p in self.entry.options.get(CONF_PROFILES, [])
-                        if p.get(CONF_PROFILE_ID) == push["profile"]), None)
-        if (not profile or profile.get(CONF_PERSON_ENTITY_ID) != push["person"]
-                or linked_user_id(self.hass, push["person"]) != owner):
+        profile = next(
+            (p for p in self.entry.options.get(CONF_PROFILES, [])
+             if p.get(CONF_PROFILE_ID) == push["profile"]),
+            None,
+        )
+        if (
+            not profile
+            or profile.get(CONF_PERSON_ENTITY_ID) != push["person"]
+            or linked_user_id(self.hass, push["person"]) != owner
+        ):
             return "recipient_changed"
         try:
             if target not in self._profile_targets(profile):
@@ -481,8 +488,9 @@ class NotificationDispatcher:
                         route.failed += 1
                         route.reason = "notify_failed"
                     continue
-                actionable = self.actions is not None and await self.actions.async_send_initial(
-                    route, target, title, message, payload_data
+                actionable = (
+                    self.actions is not None
+                    and await self.actions.async_send_initial(route, target, title, message, payload_data)
                 )
                 if not actionable:
                     await self._async_send_to_target(
@@ -573,7 +581,9 @@ class NotificationDispatcher:
                 decision = self._delivery_decision(route.profile, notification_type)
                 if not decision.should_deliver:
                     route.reason = decision.reason
-                    result["skipped"].append({"profile": _profile_name(route.profile), "reason": decision.reason})
+                    result["skipped"].append(
+                        {"profile": _profile_name(route.profile), "reason": decision.reason}
+                    )
                     continue
                 await self._async_send_profile(
                     result=result,
@@ -620,7 +630,9 @@ class NotificationDispatcher:
         if self.hass.states.get(target) is not None:
             if payload_data:
                 device = endpoint(self.hass, target)
-                legacy_service = device.service if device else _legacy_notify_service_for_entity(self.hass, target)
+                legacy_service = (
+                    device.service if device else _legacy_notify_service_for_entity(self.hass, target)
+                )
                 if legacy_service is not None:
                     legacy_data = dict(service_data)
                     legacy_data["data"] = payload_data
@@ -897,7 +909,10 @@ def _fallback_status(backups: list[Delivery]) -> str:
         return "sent" if any(b.origins for b in backups) else "already_sent"
     if any(b.failed or b.reason == "no_notify_targets" for b in backups):
         return "failed"
-    if all(b.reason in FALLBACK_DELIVERY_REASONS or b.reason == "type_not_enabled" for b in backups):
+    if all(
+        b.reason in FALLBACK_DELIVERY_REASONS or b.reason == "type_not_enabled"
+        for b in backups
+    ):
         return "blocked"
     return "not_attempted"
 
@@ -1058,6 +1073,14 @@ def _time_in_blocked_window(now_time: time, start: Any, end: Any) -> bool:
     if start_time < end_time:
         return start_time <= now_time <= end_time
     return now_time >= start_time or now_time <= end_time
+
+
+def _in_dnd(profile: dict[str, Any], now_time: time) -> bool:
+    window = _profile_time_window(
+        profile, CONF_DND_WINDOW, CONF_DND_ENABLED, CONF_DND_START, CONF_DND_END,
+        DEFAULT_DND_WINDOW,
+    )
+    return window is not None and _time_in_blocked_window(now_time, *window)
 
 
 def _default_payload_data(notification_type: str) -> dict[str, Any]:

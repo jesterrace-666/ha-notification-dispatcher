@@ -1,6 +1,6 @@
 """Exercise actual HA service calls, event contexts, timers and private storage."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from unittest import IsolatedAsyncioTestCase
 from unittest.mock import Mock, patch
@@ -8,13 +8,13 @@ from unittest.mock import Mock, patch
 from homeassistant.components import persistent_notification
 from homeassistant.const import EVENT_HOMEASSISTANT_STARTED
 from homeassistant.core import Context, EventOrigin, callback
+from test_notification_history import DispatcherFixture
 
 from custom_components.notification_dispatcher import async_setup_entry
 from custom_components.notification_dispatcher.const import DOMAIN
 from custom_components.notification_dispatcher.push_actions import EVENT_ACTION
-from test_notification_history import DispatcherFixture
 
-MONDAY = datetime(2026, 11, 23, 12, tzinfo=timezone.utc)
+MONDAY = datetime(2026, 11, 23, 12, tzinfo=UTC)
 
 
 class ActionTests(DispatcherFixture, IsolatedAsyncioTestCase):
@@ -200,6 +200,53 @@ class ActionTests(DispatcherFixture, IsolatedAsyncioTestCase):
         )
         self.assertEqual([len(v) for v in self.phones.values()], [1, 2, 1])
         self.assertEqual(len(self.bell), 1)
+
+    async def test_home_to_away_dnd_start_and_weekend_transition_while_snoozed(self):
+        profile = self.profiles[0]
+        profile.update(
+            only_when_home=True,
+            always_notify=False,
+            weekday_window="00:00-23:59",
+            weekend_window="",
+            dnd_window="",
+        )
+        friday = MONDAY + timedelta(days=4)
+        for start, reason in (
+            (MONDAY, "person_not_home"),
+            (MONDAY.replace(hour=21, minute=58), "dnd_active"),
+            (friday.replace(hour=23, minute=58), "weekend_disabled"),
+        ):
+            with self.subTest(reason=reason):
+                self.hass.states.async_set("person.linda", "home")
+                profile["dnd_window"] = "22:00-07:00" if reason == "dnd_active" else ""
+                profile["always_notify"] = (
+                    reason == "dnd_active"
+                )  # An explicit legacy DND still applies.
+                with (
+                    patch(
+                        "custom_components.notification_dispatcher.dispatcher.dt_util.now",
+                        return_value=start,
+                    ),
+                    patch(
+                        "custom_components.notification_dispatcher.push_actions.dt_util.utcnow",
+                        return_value=start,
+                    ),
+                ):
+                    await self.send()
+                    self.assertEqual(self.route()["status"], "sent")
+                    await self.press(self.buttons("linda")["5 Min."])
+                count = len(self.phones["linda"])
+                if reason == "person_not_home":
+                    self.hass.states.async_set("person.linda", "not_home")
+                due = start + timedelta(minutes=5)
+                with patch(
+                    "custom_components.notification_dispatcher.dispatcher.dt_util.now",
+                    return_value=due,
+                ):
+                    await self.dispatcher.actions.async_due(due)
+                self.assertEqual(self.route()["repeat_reason"], reason)
+                self.assertEqual(len(self.phones["linda"]), count)
+                self.assertEqual(self.phones["johannes"], [])
 
     async def test_android_menu_is_filtered_and_has_three_native_durations(self):
         self.mobile["config_entries"]["webhook_linda"].data["os_name"] = "Android"
