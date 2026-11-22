@@ -33,6 +33,15 @@ Die Action erwartet im Kern:
 3. `type`: `critical`, `info`, `warning` oder `reminder`
 4. `target`: Personen, Dispatcher-Gruppen, `alle` oder `system`. Mehrere Ziele sind kombinierbar. Bei `critical` erreicht die Nachricht immer alle konfigurierten Personen.
 
+## Notification Verlauf
+
+Unter **Seitenleiste → Notification Verlauf** siehst du die letzten 50 Dispatcher-Nachrichten, die für dich bestimmt waren, einschließlich weitergeleiteter und nicht zugestellter Nachrichten. Es ist keine Änderung an bestehenden Automationen nötig. Der Verlauf beginnt nach dem Update auf 1.6.0; Testläufe und reine Systemmeldungen erzeugen keinen persönlichen Eintrag.
+
+- Dein HA-Benutzerkonto muss mit deiner konfigurierten HA-Person verknüpft sein. Ohne diese Zuordnung bleibt der Verlauf leer. Jeder sieht nur seine eigenen Nachrichten, auch Administratoren. Ein später verknüpftes Konto übernimmt keinen fremden Verlauf.
+- Eine blockierte Nachricht nennt den Grund (etwa Ruhezeit, Zeitfenster oder Zuhause-Regel) und den tatsächlichen Ausgang der Weiterleitung. „Übergeben“ bedeutet, dass der Notify-Aufruf erfolgreich war; es ist keine Empfangsbestätigung vom Handy.
+- Der Fallback-Push beginnt z. B. mit **FB: @Linda**. Bei mehreren ursprünglichen Empfängern bleibt der Titel kurz (**FB: @Linda +1**); im eigenen Verlauf der Vertretung stehen die Namen, aber keine fremden Standort- oder Ruhezeitgründe.
+- Der Verlauf bleibt bei HA-Neustarts erhalten und wird beim Entfernen der Integration gelöscht. Die HA-Glocke für dauerhafte Systemmeldungen bleibt davon unabhängig.
+
 ## Installation
 
 ### HACS

@@ -40,6 +40,8 @@ from .const import (
     SYSTEM_GROUP_FALLBACK_TARGET_KEY,
 )
 from .dispatcher import NotificationDispatcher
+from .history import NotificationHistory
+from .panel import async_setup_panel_api, async_show_panel, hide_panel
 
 _LOGGER = logging.getLogger(__name__)
 PLATFORMS = [Platform.SENSOR]
@@ -69,6 +71,7 @@ SERVICE_SEND_SCHEMA = vol.Schema(
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Set up Notification Dispatcher."""
     hass.data.setdefault(DOMAIN, {})
+    await async_setup_panel_api(hass)
     _LOGGER.info(
         "Starting %s (%s - %s)",
         NAME,
@@ -106,10 +109,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             options=normalized_options,
         )
 
+    history = NotificationHistory(hass, entry.entry_id)
+    await history.async_load()
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = NotificationDispatcher(
-        hass, entry
+        hass, entry, history
     )
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    await async_show_panel(hass)
     return True
 
 
@@ -118,8 +124,18 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if not unload_ok:
         return False
-    hass.data.get(DOMAIN, {}).pop(entry.entry_id, None)
+    dispatchers = hass.data[DOMAIN]
+    dispatcher = dispatchers.pop(entry.entry_id)
+    if not dispatchers:
+        hide_panel(hass)
+    if dispatcher.history:
+        await dispatcher.history.async_close()
     return True
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Delete this dispatcher's private history on removal, not on reload."""
+    await NotificationHistory(hass, entry.entry_id).store.async_remove()
 
 
 def _get_dispatcher(
