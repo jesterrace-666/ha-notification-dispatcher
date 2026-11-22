@@ -1,5 +1,6 @@
 """Exercise actual HA service calls, event contexts, timers and private storage."""
 
+import asyncio
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from unittest import IsolatedAsyncioTestCase
@@ -7,7 +8,7 @@ from unittest.mock import Mock, patch
 
 from homeassistant.components import persistent_notification
 from homeassistant.const import EVENT_HOMEASSISTANT_STARTED
-from homeassistant.core import Context, EventOrigin, callback
+from homeassistant.core import Context, Event, EventOrigin, callback
 from test_notification_history import DispatcherFixture
 
 from custom_components.notification_dispatcher import async_setup_entry
@@ -395,3 +396,54 @@ class ActionTests(DispatcherFixture, IsolatedAsyncioTestCase):
             )
         self.assertEqual(len(self.phones["linda"]), 2)
         self.assertFalse(self.phones["johannes"])
+
+    async def test_second_phone_finishing_late_cannot_reset_first_phones_timer(self):
+        self.profiles[0]["notify_targets"].append(self.phone("tablet", "linda"))
+        entered, release = asyncio.Event(), asyncio.Event()
+
+        async def slow(call):
+            self.phones["tablet"].append(dict(call.data))
+            entered.set()
+            await release.wait()
+
+        self.hass.services.async_register("notify", "mobile_app_tablet", slow)
+        send = asyncio.create_task(self.send())
+        try:
+            async with asyncio.timeout(5):
+                await entered.wait()
+            await self.dispatcher.actions._on_action(
+                Event(
+                    EVENT_ACTION,
+                    {"action": self.buttons("linda")["5 Min."]},
+                    context=Context(user_id="linda"),
+                )
+            )
+            due = self.route()["due"]
+        finally:
+            release.set()
+            await send
+        await self.press(self.buttons("tablet")["60 Min."])
+        self.assertEqual(self.route()["due"], due)
+        await self.dispatcher.actions.async_due(datetime.fromisoformat(due))
+        self.assertEqual(len(self.phones["linda"]), 2)
+        self.assertEqual(len(self.phones["tablet"]), 1)
+
+    async def test_failed_personal_handoff_is_not_retried_or_forwarded(self):
+        await self.send()
+        await self.press(self.buttons("linda")["5 Min."])
+        due = datetime.fromisoformat(self.route()["due"])
+        attempts = []
+
+        @callback
+        def fail(call):
+            attempts.append(call)
+            raise ConnectionError("offline")
+
+        self.hass.services.async_register("notify", "mobile_app_linda", fail)
+        await self.dispatcher.actions.async_due(due)
+        await self.dispatcher.actions.async_due(due)
+        self.assertEqual(len(attempts), 1)
+        self.assertEqual(self.route()["repeat"], "failed")
+        self.assertEqual(self.route()["repeat_reason"], "notify_failed")
+        self.assertFalse(self.phones["johannes"])
+        self.assertFalse(self.bell)
