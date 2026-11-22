@@ -3,11 +3,11 @@
   "name": "Notification Dispatcher",
   "codeowners": ["@jesterrace-666"],
   "config_flow": true,
-  "dependencies": ["notify", "person"],
+  "dependencies": ["frontend", "http", "notify", "panel_custom", "person", "websocket_api"],
   "documentation": "https://github.com/jesterrace-666/ha-notification-dispatcher",
   "integration_type": "service",
   "iot_class": "calculated",
   "issue_tracker": "https://github.com/jesterrace-666/ha-notification-dispatcher/issues",
   "requirements": [],
-  "version": "1.5.1"
+  "version": "1.6.0"
 }

@@ -3,7 +3,7 @@
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from unittest import IsolatedAsyncioTestCase
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 from homeassistant.components import persistent_notification
 from homeassistant.config_entries import ConfigEntryState
@@ -22,6 +22,7 @@ class SystemNotificationTests(IsolatedAsyncioTestCase):
         tmp = TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         self.hass = HomeAssistant(tmp.name)
+        self.hass.http = AsyncMock()
         self.pushes = []
         self.bell_events = []
         self.person = {
@@ -159,5 +160,5 @@ class SystemNotificationTests(IsolatedAsyncioTestCase):
                 result = await self.send(target="person.johannes", type=kind)
                 self.assertEqual(len(self.bell_events), 1)
                 self.assertTrue(self.bell_events[0]["title"].startswith("System "))
-                self.assertIn("Fallback", self.pushes[0]["title"])
+                self.assertTrue(self.pushes[0]["title"].startswith("FB: @Johannes "))
                 self.assertEqual(len(result["persistent"]), 1)

@@ -12,7 +12,7 @@ from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.util import dt as dt_util
 
 from .const import (
@@ -70,6 +70,7 @@ from .const import (
     TYPE_REMINDER,
     TYPE_WARNING,
 )
+from .history import Delivery, NotificationHistory, linked_user_id
 
 _LOGGER = logging.getLogger(__name__)
 TARGET_ALL_ALIASES = {TARGET_ALL, "alle"}
@@ -92,7 +93,6 @@ TYPE_ICONS = {
 SCOPE_ICON_ALL = "🌐"
 SCOPE_ICON_GROUP = "👥"
 SCOPE_ICON_PERSONAL = "👤"
-FALLBACK_TITLE_PREFIX = "🔁 Fallback"
 FALLBACK_DELIVERY_REASONS = {
     "person_not_home",
     "weekday_disabled",
@@ -114,10 +114,16 @@ class DeliveryDecision:
 class NotificationDispatcher:
     """Dispatch notifications according to person profile rules."""
 
-    def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        entry: ConfigEntry,
+        history: NotificationHistory | None = None,
+    ) -> None:
         """Initialize the dispatcher."""
         self.hass = hass
         self.entry = entry
+        self.history = history
 
     async def async_send(self, call_data: dict[str, Any]) -> dict[str, Any]:
         """Send a notification according to configured profiles."""
@@ -143,8 +149,7 @@ class NotificationDispatcher:
         )
 
         should_send_persistent = (
-            notification_type in {TYPE_WARNING, TYPE_CRITICAL}
-            or persistent_requested
+            notification_type in {TYPE_WARNING, TYPE_CRITICAL} or persistent_requested
         )
         if not profiles and not should_send_persistent:
             raise ServiceValidationError("No matching notification profiles configured")
@@ -165,16 +170,26 @@ class NotificationDispatcher:
             "failed": [],
             "persistent": [],
         }
-        fallback_required = False
-        delivered_profile_ids: set[str] = set()
-
+        timestamp = dt_util.utcnow().isoformat()
+        # Bind owners before any service awaits; later person/account edits cannot
+        # transfer an earlier dispatch to another user's inbox.
+        owners = {
+            entity_id: linked_user_id(self.hass, entity_id)
+            for profile in self.entry.options.get(CONF_PROFILES, [])
+            if not dry_run and (entity_id := profile.get(CONF_PERSON_ENTITY_ID))
+        }
+        direct = [
+            Delivery(p, owners.get(p.get(CONF_PERSON_ENTITY_ID))) for p in profiles
+        ]
+        routes = list(direct)
+        blocked: list[Delivery] = []
         system_attempted = False
 
-        async def send_system_once() -> None:
+        async def send_system_once() -> bool:
             """Share one HA bell entry across automatic, selected, and profile targets."""
             nonlocal system_attempted
             if system_attempted:
-                return
+                return bool(result["persistent"])
             system_attempted = True
             notification_id = _persistent_notification_id(notification_type, raw_title)
             delivery = {
@@ -183,7 +198,7 @@ class NotificationDispatcher:
             }
             if dry_run:
                 result["persistent"].append({**delivery, "dry_run": True})
-                return
+                return True
 
             try:
                 await self._async_send_persistent_notification(
@@ -191,56 +206,64 @@ class NotificationDispatcher:
                     message=message,
                     notification_id=notification_id,
                 )
-            except HomeAssistantError as err:
+            except Exception as err:
                 result["failed"].append({**delivery, "error": str(err)})
                 if not continue_on_error:
                     raise
+                return False
             else:
                 result["persistent"].append(delivery)
+                return True
 
-        if should_send_persistent:
-            await send_system_once()
-
-        for profile in profiles:
-            decision = self._delivery_decision(profile, notification_type)
-            if not decision.should_deliver:
-                result["skipped"].append(
-                    {"profile": _profile_name(profile), "reason": decision.reason}
-                )
-                if decision.reason in FALLBACK_DELIVERY_REASONS:
-                    fallback_required = True
-                continue
-
+        try:
+            if should_send_persistent:
+                await send_system_once()
             payload_data = _deep_merge(
-                _default_payload_data(notification_type),
-                extra_data,
+                _default_payload_data(notification_type), extra_data
             )
-            await self._async_send_profile(
-                result=result,
-                profile=profile,
-                title=mobile_title,
-                message=message,
-                payload_data=payload_data,
-                send_system_once=send_system_once,
-                dry_run=dry_run,
-                continue_on_error=continue_on_error,
-            )
-            profile_id = str(profile.get(CONF_PROFILE_ID, "")).strip()
-            if profile_id:
-                delivered_profile_ids.add(profile_id)
-
-        if fallback_required and notification_type != TYPE_CRITICAL:
-            await self._async_send_fallback(
-                result=result,
-                delivered_profile_ids=delivered_profile_ids,
-                title=mobile_title,
-                message=message,
-                notification_type=notification_type,
-                extra_data=extra_data,
-                send_system_once=send_system_once,
-                dry_run=dry_run,
-                continue_on_error=continue_on_error,
-            )
+            for route in direct:
+                decision = self._delivery_decision(route.profile, notification_type)
+                if not decision.should_deliver:
+                    route.reason = decision.reason
+                    result["skipped"].append(
+                        {
+                            "profile": _profile_name(route.profile),
+                            "reason": decision.reason,
+                        }
+                    )
+                    if decision.reason in FALLBACK_DELIVERY_REASONS:
+                        route.fallback = "not_attempted"
+                        blocked.append(route)
+                    continue
+                await self._async_send_profile(
+                    result=result,
+                    route=route,
+                    title=mobile_title,
+                    message=message,
+                    payload_data=payload_data,
+                    send_system_once=send_system_once,
+                    dry_run=dry_run,
+                    continue_on_error=continue_on_error,
+                )
+            if blocked:
+                await self._async_send_fallback(
+                    result=result,
+                    routes=routes,
+                    blocked=blocked,
+                    owners=owners,
+                    raw_title=raw_title,
+                    message=message,
+                    notification_type=notification_type,
+                    payload_data=payload_data,
+                    send_system_once=send_system_once,
+                    dry_run=dry_run,
+                    continue_on_error=continue_on_error,
+                )
+        finally:
+            if self.history is not None and not dry_run:
+                self.history.record(
+                    routes, timestamp, notification_type, str(raw_title or ""), message
+                )
 
         _LOGGER.debug("Notification dispatcher result: %s", result)
         return result
@@ -395,17 +418,24 @@ class NotificationDispatcher:
         self,
         *,
         result: dict[str, list[dict[str, Any]]],
-        profile: dict[str, Any],
+        route: Delivery,
         title: str,
         message: str,
         payload_data: dict[str, Any],
-        send_system_once: Callable[[], Awaitable[None]],
+        send_system_once: Callable[[], Awaitable[bool]],
         dry_run: bool,
         continue_on_error: bool,
     ) -> None:
         """Send a notification to all targets of a profile."""
-        targets = self._profile_targets(profile)
+        profile = route.profile
+        try:
+            targets = self._profile_targets(profile)
+        except ServiceValidationError:
+            route.failed += 1
+            route.reason = "invalid_notify_target"
+            raise
         if not targets:
+            route.reason = "no_notify_targets"
             result["skipped"].append(
                 {
                     "profile": _profile_name(profile),
@@ -415,26 +445,36 @@ class NotificationDispatcher:
             return
 
         for target in targets:
-            if target == "notify.persistent_notification":
-                await send_system_once()
-                continue
-            if dry_run:
+            if dry_run and target != "notify.persistent_notification":
                 sent = {
                     "profile": _profile_name(profile),
                     "target": target,
                     "dry_run": True,
                 }
                 result["sent"].append(sent)
+                route.accepted += 1
                 continue
 
             try:
+                if target == "notify.persistent_notification":
+                    if await send_system_once():
+                        route.accepted += 1
+                    else:
+                        route.failed += 1
+                        route.reason = "notify_failed"
+                    continue
                 await self._async_send_to_target(
                     target=target,
                     title=title,
                     message=message,
                     payload_data=payload_data,
                 )
-            except HomeAssistantError as err:
+            except Exception as err:
+                # Notify integrations can also propagate transport or schema errors.
+                route.failed += 1
+                route.reason = "notify_failed"
+                if target == "notify.persistent_notification":
+                    raise  # The shared system path already recorded this failure.
                 failed = {
                     "profile": _profile_name(profile),
                     "target": target,
@@ -450,6 +490,7 @@ class NotificationDispatcher:
                     err,
                 )
             else:
+                route.accepted += 1
                 sent = {"profile": _profile_name(profile), "target": target}
                 result["sent"].append(sent)
 
@@ -457,55 +498,71 @@ class NotificationDispatcher:
         self,
         *,
         result: dict[str, list[dict[str, Any]]],
-        delivered_profile_ids: set[str],
-        title: str,
+        routes: list[Delivery],
+        blocked: list[Delivery],
+        owners: dict[str, str | None],
+        raw_title: Any,
         message: str,
         notification_type: str,
-        extra_data: dict[str, Any],
-        send_system_once: Callable[[], Awaitable[None]],
+        payload_data: dict[str, Any],
+        send_system_once: Callable[[], Awaitable[bool]],
         dry_run: bool,
         continue_on_error: bool,
     ) -> None:
         """Send skipped notifications to the built-in fallback group."""
-        fallback_profiles = self._fallback_profiles(delivered_profile_ids)
-        if not fallback_profiles:
-            result["skipped"].append({"profile": "Fallback", "reason": "fallback_empty"})
-            return
-
-        fallback_title = _fallback_title(title)
-        payload_data = _deep_merge(
-            _default_payload_data(notification_type),
-            extra_data,
-        )
-        for profile in fallback_profiles:
-            await self._async_send_profile(
-                result=result,
-                profile=profile,
-                title=fallback_title,
-                message=message,
-                payload_data=payload_data,
-                send_system_once=send_system_once,
-                dry_run=dry_run,
-                continue_on_error=continue_on_error,
+        members = self._fallback_member_ids()
+        attempted = {
+            r.profile[CONF_PROFILE_ID]: r
+            for r in routes
+            if (r.accepted or r.failed or r.reason == "no_notify_targets")
+            and CONF_PROFILE_ID in r.profile
+        }
+        assigned: dict[Delivery, list[Delivery]] = {source: [] for source in blocked}
+        forward: list[Delivery] = []
+        for profile in self.entry.options.get(CONF_PROFILES, []):
+            profile_id = profile.get(CONF_PROFILE_ID)
+            if profile_id not in members:
+                continue
+            sources = [
+                source
+                for source in blocked
+                if source.profile.get(CONF_PROFILE_ID) != profile_id
+            ]
+            if not sources:
+                continue
+            route = attempted.get(profile_id)
+            if route is None:
+                names = tuple(
+                    dict.fromkeys(_profile_name(source.profile) for source in sources)
+                )
+                route = Delivery(
+                    profile, owners.get(profile.get(CONF_PERSON_ENTITY_ID)), names
+                )
+                forward.append(route)
+                routes.append(route)
+            for source in sources:
+                assigned[source].append(route)
+        if not any(assigned.values()):
+            result["skipped"].append(
+                {"profile": "Fallback", "reason": "fallback_empty"}
             )
-
-    def _fallback_profiles(self, delivered_profile_ids: set[str]) -> list[dict[str, Any]]:
-        """Return fallback profiles except recipients that already got the message."""
-        fallback_member_ids = self._fallback_member_ids()
-        if not fallback_member_ids:
-            return []
-
-        fallback_profiles: list[dict[str, Any]] = []
-        for profile in _ensure_mapping_list(self.entry.options.get(CONF_PROFILES, [])):
-            profile_id = str(profile.get(CONF_PROFILE_ID, "")).strip()
-            if not profile_id:
-                continue
-            if profile_id in delivered_profile_ids:
-                continue
-            if profile_id in fallback_member_ids:
-                fallback_profiles.append(profile)
-
-        return fallback_profiles
+        try:
+            for route in forward:
+                await self._async_send_profile(
+                    result=result,
+                    route=route,
+                    title=_format_title(
+                        notification_type, raw_title, _fallback_prefix(route.origins)
+                    ),
+                    message=message,
+                    payload_data=payload_data,
+                    send_system_once=send_system_once,
+                    dry_run=dry_run,
+                    continue_on_error=continue_on_error,
+                )
+        finally:
+            for source, backups in assigned.items():
+                source.fallback = _fallback_status(backups)
 
     def _fallback_member_ids(self) -> set[str]:
         """Return configured member ids of the built-in fallback group."""
@@ -795,11 +852,23 @@ def _format_title(notification_type: str, title: Any, scope_prefix: str) -> str:
     return f"{scope_prefix} {icon}"
 
 
-def _fallback_title(title: str) -> str:
-    """Mark a fallback reroute in the notification title."""
-    if title.startswith(FALLBACK_TITLE_PREFIX):
-        return title
-    return f"{FALLBACK_TITLE_PREFIX} {title}".strip()
+def _fallback_prefix(names: tuple[str, ...]) -> str:
+    """Keep the push compact; all original names are visible to its recipient."""
+    handle = "_".join(names[0].lstrip("@").split())
+    more = f" +{len(names) - 1}" if len(names) > 1 else ""
+    return f"FB: @{handle}{more}"
+
+
+def _fallback_status(backups: list[Delivery]) -> str:
+    if not backups:
+        return "empty"
+    if any(b.accepted for b in backups):
+        if any(not b.accepted or b.failed for b in backups):
+            return "partial"
+        return "sent" if any(b.origins for b in backups) else "already_sent"
+    if any(b.failed or b.reason == "no_notify_targets" for b in backups):
+        return "failed"
+    return "not_attempted"
 
 
 def _recipient_scope_prefix(
