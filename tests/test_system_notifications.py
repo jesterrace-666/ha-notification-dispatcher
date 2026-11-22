@@ -144,6 +144,8 @@ class SystemNotificationTests(IsolatedAsyncioTestCase):
             {
                 "id": "backup",
                 "name": "Backup",
+                "always_notify": True,
+                "enabled_types": ["warning", "info"],
                 "notify_targets": [
                     "notify.persistent_notification",
                     "notify.mobile_app_phone",

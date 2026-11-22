@@ -23,6 +23,8 @@ Built-in groups:
 - `all/alle` (non-removable)
 - `fallback` (non-removable): receives rerouted notifications when originally selected recipients are skipped because of schedule, DND, or home checks.
 
+**Herald 1.7:** Mark a Companion push as read or be reminded in 5, 30, or 60 minutes directly from the notification. Personal reminders recheck the recipient's current rules, go only to the requesting device, and never create another system or fallback notification. No changes to automations are required.
+
 Release highlight:
 
 - `v1.2.0 Herald`: adds built-in fallback-group based rerouting for skipped recipients.

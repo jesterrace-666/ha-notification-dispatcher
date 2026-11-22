@@ -19,6 +19,11 @@ const words = {
     fb_already_sent: "Bereits direkt an Fallback übergeben", fb_empty: "Kein anderer Fallback-Empfänger",
     fb_failed: "Fallback-Versand fehlgeschlagen", fb_not_attempted: "Fallback nicht ausgeführt",
     fb_none: "Kein Fallback", untitled: "Ohne Titel",
+    fb_blocked: "Kein Fallback-Empfänger war erreichbar", read: "Gelesen",
+    due: "Erneut erinnern um", repeat_sent: "Erinnerung übergeben",
+    repeat_blocked: "Erinnerung nicht zugestellt", repeat_failed: "Erinnerungsversand fehlgeschlagen",
+    repeat_interrupted: "Erinnerungsversand unterbrochen", recipient_changed: "Empfänger oder Gerät nicht mehr zugeordnet",
+    invalid_profile: "Empfängerregeln ungültig",
   },
   en: {
     title: "Notification history", refresh: "Refresh", filter: "Status",
@@ -37,6 +42,10 @@ const words = {
     fb_partial: "Partially handed off to fallback", fb_already_sent: "Fallback already notified directly",
     fb_empty: "No other fallback recipient", fb_failed: "Fallback delivery failed",
     fb_not_attempted: "Fallback not attempted", fb_none: "No fallback", untitled: "Untitled",
+    fb_blocked: "No fallback recipient was available", read: "Read",
+    due: "Remind again at", repeat_sent: "Reminder handed off", repeat_blocked: "Reminder not delivered",
+    repeat_failed: "Reminder delivery failed", repeat_interrupted: "Reminder delivery interrupted",
+    recipient_changed: "Recipient or device is no longer linked", invalid_profile: "Invalid recipient rules",
   },
 };
 
@@ -149,7 +158,7 @@ class NotificationDispatcherHistory extends HTMLElement {
     let currentDay;
     for (const row of this.rows) {
       const routes = row.routes.filter(r => filter === "all" ||
-        (filter === "problems" ? r.status !== "sent" : r.fallback || r.for.length));
+        (filter === "problems" ? r.status !== "sent" || ["blocked", "failed", "interrupted"].includes(r.repeat) : r.fallback || r.for.length));
       if (!routes.length) continue;
       const date = new Date(row.timestamp);
       const group = day.format(date);
@@ -168,6 +177,12 @@ class NotificationDispatcherHistory extends HTMLElement {
         const fb = route.fallback ? w["fb_" + route.fallback] : !route.for.length && route.status !== "sent" ? w.fb_none : "";
         if (reason) body.append(element("div", reason, "detail"));
         if (fb) body.append(element("div", fb, "detail"));
+        if (route.read) body.append(element("div", w.read, "detail"));
+        if (route.due) body.append(element("div", w.due + " " + clock.format(new Date(route.due)), "detail"));
+        if (route.repeat) {
+          const parts = [w["repeat_" + route.repeat], w[route.repeat_reason]].filter(Boolean);
+          body.append(element("div", parts.join(" · "), "detail"));
+        }
       }
       const time = element("time", clock.format(date));
       time.dateTime = row.timestamp;

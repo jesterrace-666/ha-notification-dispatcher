@@ -26,7 +26,7 @@ from custom_components.notification_dispatcher.panel import (
 )
 
 
-class HistoryTests(IsolatedAsyncioTestCase):
+class DispatcherFixture:
     async def asyncSetUp(self):
         tmp = TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
@@ -110,6 +110,8 @@ class HistoryTests(IsolatedAsyncioTestCase):
         )
         return connection.send_result.call_args.args[1]
 
+
+class HistoryTests(DispatcherFixture, IsolatedAsyncioTestCase):
     async def test_home_rule_fallback_and_account_bound_reads(self):
         self.profiles[0]["only_when_home"] = True
         await self.send()

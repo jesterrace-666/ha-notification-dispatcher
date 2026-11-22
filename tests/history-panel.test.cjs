@@ -25,8 +25,9 @@ for (const [layout, width, height] of [["desktop", 1152, 800], ["mobile", 320, 7
       });
       window.items = [
         make("Büro", "blocked", { reason: "person_not_home", fallback: "sent" }),
-        make("Wartung", "sent", { for: ["Mara"] }),
-        make("Update", "sent"),
+        make("Wartung", "sent", { for: ["Mara"], read: true }),
+        make("Update", "sent", { due: "2026-11-22T19:12:00+00:00" }),
+        make("Erinnerung", "sent", { repeat: "blocked", repeat_reason: "dnd_active" }),
       ];
       window.session = (id, fetch) => ({
         user: { id }, connection: {}, language: "de", config: { time_zone: "Europe/Berlin" },
@@ -41,11 +42,14 @@ for (const [layout, width, height] of [["desktop", 1152, 800], ["mobile", 320, 7
       panel.hass = session("linda", async () => items);
     });
     await page.getByText("An Fallback übergeben", { exact: false }).waitFor();
-    assert.equal(await page.locator("article").count(), 3);
+    assert.equal(await page.locator("article").count(), 4);
+    await page.getByText("Gelesen", { exact: true }).waitFor();
+    await page.getByText("Erneut erinnern um 20:12", { exact: true }).waitFor();
     await page.getByText("FB: @Mara · Übergeben", { exact: true }).waitFor();
     const filter = page.getByRole("combobox", { name: "Status" });
     await filter.selectOption("problems");
-    assert.equal(await page.locator("article").count(), 1);
+    assert.equal(await page.locator("article").count(), 2);
+    await page.getByText("Erinnerung nicht zugestellt · Nicht stören: Ruhezeit aktiv", { exact: true }).waitFor();
     await page.getByText("keine Anwesenheit erkannt", { exact: false }).waitFor();
     await filter.selectOption("forwarded");
     assert.equal(await page.locator("article").count(), 2);
