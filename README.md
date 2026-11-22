@@ -31,7 +31,7 @@ Die Action erwartet im Kern:
 1. `title`
 2. `message`
 3. `type`: `critical`, `info`, `warning` oder `reminder`
-4. `target`: leer, `all`/`alle`, eine Person oder eine Dispatcher-Gruppe
+4. `target`: Personen, Dispatcher-Gruppen, `alle` oder `system`. Mehrere Ziele sind kombinierbar. Bei `critical` erreicht die Nachricht immer alle konfigurierten Personen.
 
 ## Installation
 
@@ -67,6 +67,28 @@ Ein leeres Werktag- oder Wochenende-Feld bedeutet: an diesen Tagen nicht zustell
 Das Ziel `all` bzw. `alle` ist immer vorhanden und kann nicht geloescht werden. Zusaetzlich gibt es die feste Gruppe `fallback`, die nicht geloescht werden kann und fuer automatische Umleitungen genutzt wird. Weitere Gruppen kannst du in den Optionen anlegen, zum Beispiel `familie`.
 
 ## Action nutzen
+
+### Systemmeldungen
+
+Im Aktionseditor findest du unter **Ziele** den Eintrag **Systemmeldung (dauerhaft)**.
+Für einen Update-Hinweis in der HA-Glocke genügt folgende Aktion.
+
+```yaml
+action: notification_dispatcher.send
+data:
+  target: system
+  title: "Update verfügbar"
+  message: "Für Home Assistant Core gibt es eine neue Version."
+```
+
+Für einen zusätzlichen Push an Johannes wählst du beide Ziele oder setzt in YAML
+`target: [system, person.johannes]`. Die Glocke zeigt **System** und den Titel,
+der Push zeigt den Empfängerkreis. Bei `warning` und `critical` entsteht der
+Systemeintrag automatisch genau einmal. Bei gleichem Titel und Typ aktualisiert
+der nächste Aufruf denselben Eintrag. Die zurückgegebene
+`persistent[0].notification_id` kannst du mit `persistent_notification.dismiss` aufheben.
+
+### Weitere Beispiele
 
 ```yaml
 action: notification_dispatcher.send
@@ -119,6 +141,7 @@ data:
   title: "Garage"
   message: "Das Garagentor ist noch offen."
   type: warning
+  target: person.johannes
   data:
     tag: garage-door
     group: security

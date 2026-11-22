@@ -129,6 +129,13 @@
       "save_failed": "Die Person konnte nicht gespeichert werden. Details stehen im Home-Assistant-Log."
     }
   },
+  "entity": {
+    "sensor": {
+      "system_notification": {
+        "name": "Systemmeldung (dauerhaft)"
+      }
+    }
+  },
   "selector": {
     "notification_type": {
       "options": {
@@ -142,7 +149,7 @@
   "services": {
     "send": {
       "name": "Benachrichtigung senden",
-      "description": "Sendet eine Benachrichtigung nach den Regeln der konfigurierten Dispatcher-Personen.",
+      "description": "Wähle für einen Push Personen oder Gruppen. Wähle „Systemmeldung (dauerhaft)“ allein oder zusätzlich für einen Eintrag in der HA-Glocke. Warnungen und kritische Meldungen erscheinen dort automatisch.",
       "fields": {
         "title": {
           "name": "Titel",
@@ -158,7 +165,7 @@
         },
         "target": {
           "name": "Empfaenger",
-          "description": "Waehle Empfaenger oder Gruppen. Zusatz-Ziel: \"Home Assistant (Dauerhaft)\" fuer eine permanente Benachrichtigung in HA."
+          "description": "Personen, Gruppen oder „Systemmeldung (dauerhaft)“ für die Benachrichtigungsleiste."
         }
       }
     }

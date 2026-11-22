@@ -129,6 +129,13 @@
       "save_failed": "The person could not be saved. Details are available in the Home Assistant log."
     }
   },
+  "entity": {
+    "sensor": {
+      "system_notification": {
+        "name": "System notification (persistent)"
+      }
+    }
+  },
   "selector": {
     "notification_type": {
       "options": {
@@ -142,7 +149,7 @@
   "services": {
     "send": {
       "name": "Send notification",
-      "description": "Dispatch a notification to configured dispatcher people according to their rules.",
+      "description": "Choose people or groups for push notifications. Select System notification (persistent) on its own or alongside them for an entry in the Home Assistant notification panel. Warnings and critical alerts appear there automatically.",
       "fields": {
         "title": {
           "name": "Title",
@@ -158,7 +165,7 @@
         },
         "target": {
           "name": "Recipients",
-          "description": "Select recipients or groups. Extra target: \"Home Assistant (Dauerhaft)\" to create a persistent HA notification."
+          "description": "People, groups, or System notification (persistent) for the Home Assistant notification panel."
         }
       }
     }

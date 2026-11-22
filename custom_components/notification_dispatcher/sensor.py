@@ -23,7 +23,6 @@ from .const import (
     CONF_TARGET_KEY,
     SYSTEM_TARGET_HOME_ASSISTANT_PERSISTENT_ID,
     SYSTEM_TARGET_HOME_ASSISTANT_PERSISTENT_KEY,
-    SYSTEM_TARGET_HOME_ASSISTANT_PERSISTENT_NAME,
     TARGET_ALL,
     TARGET_TYPE_ALL,
     TARGET_TYPE_GROUP,
@@ -49,12 +48,12 @@ async def async_setup_entry(
         ),
         DispatcherRecipientSensor(
             entry_id=entry.entry_id,
-            name=SYSTEM_TARGET_HOME_ASSISTANT_PERSISTENT_NAME,
+            translation_key="system_notification",
             object_id=SYSTEM_TARGET_HOME_ASSISTANT_PERSISTENT_ID,
             target_key=SYSTEM_TARGET_HOME_ASSISTANT_PERSISTENT_KEY,
             target_type=TARGET_TYPE_SYSTEM,
             icon="mdi:bell-badge-outline",
-        )
+        ),
     ]
 
     for profile in _coerce_mapping_list(entry.options.get(CONF_PROFILES, [])):
@@ -119,7 +118,8 @@ class DispatcherRecipientSensor(SensorEntity):
         self,
         *,
         entry_id: str,
-        name: str,
+        name: str | None = None,
+        translation_key: str | None = None,
         object_id: str,
         target_key: str,
         target_type: str,
@@ -130,7 +130,9 @@ class DispatcherRecipientSensor(SensorEntity):
         """Initialize one dispatcher recipient sensor."""
         self._attr_unique_id = f"{entry_id}_{object_id}"
         self._attr_object_id = object_id
-        self._attr_name = name
+        if name is not None:
+            self._attr_name = name
+        self._attr_translation_key = translation_key
         self._attr_icon = icon
 
         attributes: dict[str, Any] = {

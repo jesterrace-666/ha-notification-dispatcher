@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from copy import deepcopy
 from dataclasses import dataclass
 from datetime import time
@@ -91,7 +92,6 @@ TYPE_ICONS = {
 SCOPE_ICON_ALL = "🌐"
 SCOPE_ICON_GROUP = "👥"
 SCOPE_ICON_PERSONAL = "👤"
-SCOPE_ICON_SYSTEM = "🖥️"
 FALLBACK_TITLE_PREFIX = "🔁 Fallback"
 FALLBACK_DELIVERY_REASONS = {
     "person_not_home",
@@ -149,15 +149,11 @@ class NotificationDispatcher:
         if not profiles and not should_send_persistent:
             raise ServiceValidationError("No matching notification profiles configured")
 
-        scope_prefix = _recipient_scope_prefix(
-            self.entry,
-            target_keys,
+        raw_title = call_data.get(ATTR_TITLE)
+        mobile_title = _format_title(
             notification_type,
-        )
-        title = _format_title(
-            notification_type,
-            call_data.get(ATTR_TITLE),
-            scope_prefix,
+            raw_title,
+            _recipient_scope_prefix(self.entry, profile_target_keys, notification_type),
         )
         extra_data = _coerce_payload_data(call_data.get(ATTR_DATA))
         dry_run = bool(call_data.get(ATTR_DRY_RUN, False))
@@ -172,42 +168,38 @@ class NotificationDispatcher:
         fallback_required = False
         delivered_profile_ids: set[str] = set()
 
-        persistent_notification_id = _persistent_notification_id(
-            notification_type,
-            call_data.get(ATTR_TITLE),
-        )
-        if should_send_persistent and not dry_run:
+        system_attempted = False
+
+        async def send_system_once() -> None:
+            """Share one HA bell entry across automatic, selected, and profile targets."""
+            nonlocal system_attempted
+            if system_attempted:
+                return
+            system_attempted = True
+            notification_id = _persistent_notification_id(notification_type, raw_title)
+            delivery = {
+                "target": "persistent_notification.create",
+                ATTR_NOTIFICATION_ID: notification_id,
+            }
+            if dry_run:
+                result["persistent"].append({**delivery, "dry_run": True})
+                return
+
             try:
                 await self._async_send_persistent_notification(
-                    title=title,
+                    title=_format_title(notification_type, raw_title, "System"),
                     message=message,
-                    notification_id=persistent_notification_id,
+                    notification_id=notification_id,
                 )
             except HomeAssistantError as err:
-                result["failed"].append(
-                    {
-                        "target": "persistent_notification.create",
-                        ATTR_NOTIFICATION_ID: persistent_notification_id,
-                        "error": str(err),
-                    }
-                )
+                result["failed"].append({**delivery, "error": str(err)})
                 if not continue_on_error:
                     raise
             else:
-                result["persistent"].append(
-                    {
-                        "target": "persistent_notification.create",
-                        ATTR_NOTIFICATION_ID: persistent_notification_id,
-                    }
-                )
-        elif should_send_persistent and dry_run:
-            result["persistent"].append(
-                {
-                    "target": "persistent_notification.create",
-                    ATTR_NOTIFICATION_ID: persistent_notification_id,
-                    "dry_run": True,
-                }
-            )
+                result["persistent"].append(delivery)
+
+        if should_send_persistent:
+            await send_system_once()
 
         for profile in profiles:
             decision = self._delivery_decision(profile, notification_type)
@@ -226,9 +218,10 @@ class NotificationDispatcher:
             await self._async_send_profile(
                 result=result,
                 profile=profile,
-                title=title,
+                title=mobile_title,
                 message=message,
                 payload_data=payload_data,
+                send_system_once=send_system_once,
                 dry_run=dry_run,
                 continue_on_error=continue_on_error,
             )
@@ -240,10 +233,11 @@ class NotificationDispatcher:
             await self._async_send_fallback(
                 result=result,
                 delivered_profile_ids=delivered_profile_ids,
-                title=title,
+                title=mobile_title,
                 message=message,
                 notification_type=notification_type,
                 extra_data=extra_data,
+                send_system_once=send_system_once,
                 dry_run=dry_run,
                 continue_on_error=continue_on_error,
             )
@@ -405,6 +399,7 @@ class NotificationDispatcher:
         title: str,
         message: str,
         payload_data: dict[str, Any],
+        send_system_once: Callable[[], Awaitable[None]],
         dry_run: bool,
         continue_on_error: bool,
     ) -> None:
@@ -420,6 +415,9 @@ class NotificationDispatcher:
             return
 
         for target in targets:
+            if target == "notify.persistent_notification":
+                await send_system_once()
+                continue
             if dry_run:
                 sent = {
                     "profile": _profile_name(profile),
@@ -464,6 +462,7 @@ class NotificationDispatcher:
         message: str,
         notification_type: str,
         extra_data: dict[str, Any],
+        send_system_once: Callable[[], Awaitable[None]],
         dry_run: bool,
         continue_on_error: bool,
     ) -> None:
@@ -485,6 +484,7 @@ class NotificationDispatcher:
                 title=fallback_title,
                 message=message,
                 payload_data=payload_data,
+                send_system_once=send_system_once,
                 dry_run=dry_run,
                 continue_on_error=continue_on_error,
             )
@@ -641,18 +641,14 @@ def _target_keys_from_call(
     if notification_type == TYPE_CRITICAL:
         return [TARGET_ALL]
 
-    if call_data.get(ATTR_TARGET_ALL) is True:
-        return [TARGET_ALL]
-
     raw_values = _ensure_list(call_data.get(ATTR_TARGET))
     if not raw_values:
         raw_values = _ensure_list(call_data.get(ATTR_ENTITY_ID))
     if not raw_values:
         raw_values = _ensure_list(call_data.get(ATTR_RECIPIENTS))
-    if not raw_values:
-        raise ServiceValidationError("Select at least one recipient")
-
-    target_keys: list[str] = []
+    target_keys: list[str] = (
+        [TARGET_ALL] if call_data.get(ATTR_TARGET_ALL) is True else []
+    )
     for raw_value in raw_values:
         for extracted_value in _extract_target_values(raw_value):
             resolved_value = _target_key_from_entity_id(hass, extracted_value)
@@ -811,23 +807,19 @@ def _recipient_scope_prefix(
     target_keys: list[str],
     notification_type: str,
 ) -> str:
-    """Return a visible title prefix for recipient scope."""
+    """Return the recipient scope shown in a mobile notification."""
     requested_keys = {_normalize_target_key(key) for key in target_keys}
-    persistent_requested = bool(requested_keys & TARGET_PERSISTENT_ALIASES)
-    recipient_keys = requested_keys - TARGET_PERSISTENT_ALIASES
 
-    if notification_type == TYPE_CRITICAL or recipient_keys & TARGET_ALL_ALIASES:
+    if notification_type == TYPE_CRITICAL or requested_keys & TARGET_ALL_ALIASES:
         return f"{SCOPE_ICON_ALL} Alle"
-    if not recipient_keys and persistent_requested:
-        return f"{SCOPE_ICON_SYSTEM} Home Assistant"
 
-    matched_group_names = _matched_group_names(entry, recipient_keys)
+    matched_group_names = _matched_group_names(entry, requested_keys)
     if matched_group_names:
         if len(matched_group_names) == 1:
             return f"{SCOPE_ICON_GROUP} @{matched_group_names[0]}"
         return f"{SCOPE_ICON_GROUP} Gruppen"
 
-    matched_profile_names = _matched_profile_names(entry, recipient_keys)
+    matched_profile_names = _matched_profile_names(entry, requested_keys)
     if len(matched_profile_names) <= 1:
         return f"{SCOPE_ICON_PERSONAL} Persoenlich"
     return f"{SCOPE_ICON_GROUP} Mehrere"
