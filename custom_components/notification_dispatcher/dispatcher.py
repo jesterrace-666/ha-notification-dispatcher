@@ -70,7 +70,8 @@ from .const import (
     TYPE_REMINDER,
     TYPE_WARNING,
 )
-from .history import Delivery, NotificationHistory, linked_user_id
+from .history import Delivery, DispatchNote, NotificationHistory, linked_user_id
+from .push_actions import PushActions, endpoint
 
 _LOGGER = logging.getLogger(__name__)
 TARGET_ALL_ALIASES = {TARGET_ALL, "alle"}
@@ -124,6 +125,7 @@ class NotificationDispatcher:
         self.hass = hass
         self.entry = entry
         self.history = history
+        self.actions = PushActions(self, history) if history is not None else None
 
     async def async_send(self, call_data: dict[str, Any]) -> dict[str, Any]:
         """Send a notification according to configured profiles."""
@@ -170,7 +172,7 @@ class NotificationDispatcher:
             "failed": [],
             "persistent": [],
         }
-        timestamp = dt_util.utcnow().isoformat()
+        note = DispatchNote(dt_util.utcnow().isoformat(), notification_type, str(raw_title or ""), message)
         # Bind owners before any service awaits; later person/account edits cannot
         # transfer an earlier dispatch to another user's inbox.
         owners = {
@@ -238,6 +240,7 @@ class NotificationDispatcher:
                 await self._async_send_profile(
                     result=result,
                     route=route,
+                    note=note,
                     title=mobile_title,
                     message=message,
                     payload_data=payload_data,
@@ -249,6 +252,7 @@ class NotificationDispatcher:
                 await self._async_send_fallback(
                     result=result,
                     routes=routes,
+                    note=note,
                     blocked=blocked,
                     owners=owners,
                     raw_title=raw_title,
@@ -261,9 +265,7 @@ class NotificationDispatcher:
                 )
         finally:
             if self.history is not None and not dry_run:
-                self.history.record(
-                    routes, timestamp, notification_type, str(raw_title or ""), message
-                )
+                self.history.record(routes, note)
 
         _LOGGER.debug("Notification dispatcher result: %s", result)
         return result
@@ -333,14 +335,14 @@ class NotificationDispatcher:
         return member_ids, matched_group_keys
 
     def _delivery_decision(
-        self, profile: dict[str, Any], notification_type: str
+        self, profile: dict[str, Any], notification_type: str, *, personal_repeat: bool = False
     ) -> DeliveryDecision:
         """Decide whether a profile should receive the notification."""
-        if notification_type == TYPE_CRITICAL:
+        if notification_type == TYPE_CRITICAL and not personal_repeat:
             return DeliveryDecision(True, "critical")
 
         enabled_types = set(_ensure_list(profile.get(CONF_ENABLED_TYPES)))
-        if notification_type not in enabled_types:
+        if notification_type != TYPE_CRITICAL and notification_type not in enabled_types:
             return DeliveryDecision(False, "type_not_enabled")
 
         if profile.get(CONF_ONLY_WHEN_HOME, False) and not self._is_home(profile):
@@ -393,6 +395,21 @@ class NotificationDispatcher:
 
         return DeliveryDecision(True, "matched")
 
+    def personal_push_denial(self, push: dict, owner: str, kind: str, target: str) -> str | None:
+        """Re-evaluate the current profile, never re-expand a group or invoke fallback."""
+        profile = next((p for p in self.entry.options.get(CONF_PROFILES, [])
+                        if p.get(CONF_PROFILE_ID) == push["profile"]), None)
+        if (not profile or profile.get(CONF_PERSON_ENTITY_ID) != push["person"]
+                or linked_user_id(self.hass, push["person"]) != owner):
+            return "recipient_changed"
+        try:
+            if target not in self._profile_targets(profile):
+                return "recipient_changed"
+            decision = self._delivery_decision(profile, kind, personal_repeat=True)
+        except (ServiceValidationError, ValueError):
+            return "invalid_profile"
+        return None if decision.should_deliver else decision.reason
+
     def _is_home(self, profile: dict[str, Any]) -> bool:
         """Return whether the configured person is home."""
         person_entity_id = profile.get(CONF_PERSON_ENTITY_ID)
@@ -419,6 +436,7 @@ class NotificationDispatcher:
         *,
         result: dict[str, list[dict[str, Any]]],
         route: Delivery,
+        note: DispatchNote,
         title: str,
         message: str,
         payload_data: dict[str, Any],
@@ -463,12 +481,13 @@ class NotificationDispatcher:
                         route.failed += 1
                         route.reason = "notify_failed"
                     continue
-                await self._async_send_to_target(
-                    target=target,
-                    title=title,
-                    message=message,
-                    payload_data=payload_data,
+                actionable = self.actions is not None and await self.actions.async_send_initial(
+                    route, target, title, message, payload_data
                 )
+                if not actionable:
+                    await self._async_send_to_target(
+                        target=target, title=title, message=message, payload_data=payload_data
+                    )
             except Exception as err:
                 # Notify integrations can also propagate transport or schema errors.
                 route.failed += 1
@@ -491,6 +510,8 @@ class NotificationDispatcher:
                 )
             else:
                 route.accepted += 1
+                if actionable and self.history is not None:
+                    self.history.record([route], note, stage=True)
                 sent = {"profile": _profile_name(profile), "target": target}
                 result["sent"].append(sent)
 
@@ -499,6 +520,7 @@ class NotificationDispatcher:
         *,
         result: dict[str, list[dict[str, Any]]],
         routes: list[Delivery],
+        note: DispatchNote,
         blocked: list[Delivery],
         owners: dict[str, str | None],
         raw_title: Any,
@@ -548,9 +570,15 @@ class NotificationDispatcher:
             )
         try:
             for route in forward:
+                decision = self._delivery_decision(route.profile, notification_type)
+                if not decision.should_deliver:
+                    route.reason = decision.reason
+                    result["skipped"].append({"profile": _profile_name(route.profile), "reason": decision.reason})
+                    continue
                 await self._async_send_profile(
                     result=result,
                     route=route,
+                    note=note,
                     title=_format_title(
                         notification_type, raw_title, _fallback_prefix(route.origins)
                     ),
@@ -591,7 +619,8 @@ class NotificationDispatcher:
 
         if self.hass.states.get(target) is not None:
             if payload_data:
-                legacy_service = _legacy_notify_service_for_entity(self.hass, target)
+                device = endpoint(self.hass, target)
+                legacy_service = device.service if device else _legacy_notify_service_for_entity(self.hass, target)
                 if legacy_service is not None:
                     legacy_data = dict(service_data)
                     legacy_data["data"] = payload_data
@@ -868,6 +897,8 @@ def _fallback_status(backups: list[Delivery]) -> str:
         return "sent" if any(b.origins for b in backups) else "already_sent"
     if any(b.failed or b.reason == "no_notify_targets" for b in backups):
         return "failed"
+    if all(b.reason in FALLBACK_DELIVERY_REASONS or b.reason == "type_not_enabled" for b in backups):
+        return "blocked"
     return "not_attempted"
 
 

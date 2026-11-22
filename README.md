@@ -42,6 +42,15 @@ Unter **Seitenleiste → Notification Verlauf** siehst du die letzten 50 Dispatc
 - Der Fallback-Push beginnt z. B. mit **FB: @Linda**. Bei mehreren ursprünglichen Empfängern bleibt der Titel kurz (**FB: @Linda +1**); im eigenen Verlauf der Vertretung stehen die Namen, aber keine fremden Standort- oder Ruhezeitgründe.
 - Der Verlauf bleibt bei HA-Neustarts erhalten und wird beim Entfernen der Integration gelöscht. Die HA-Glocke für dauerhafte Systemmeldungen bleibt davon unabhängig.
 
+### Direkt auf dem Handy antworten
+
+Ab **1.7.0 Herald** kannst du eine Dispatcher-Mitteilung auf dem iPhone gedrückt halten und **Gelesen**, **5 Min.**, **30 Min.** oder **60 Min.** wählen. Android bietet **Gelesen** und **Erinnern ...** an; die zweite Aktion zeigt die drei Zeiten als Schaltflächen in einer weiteren Mitteilung an. Es ist weder eine Bestätigung erforderlich noch eine zusätzliche Automation. Ohne Auswahl passiert nichts.
+
+- **Gelesen** markiert nur deinen Eintrag im Notification Verlauf und storniert eine dafür vorgemerkte Erinnerung. Die gemeinsame HA-Systemmeldung und die Nachrichten anderer Personen bleiben unverändert.
+- Die Erinnerung geht nur an das Gerät, auf dem du die Zeit gewählt hast. Bei Fälligkeit prüft der Dispatcher deine **aktuellen** Einstellungen: Nachrichtentyp, Anwesenheit, Wochentag und Zeitfenster sowie eine gegebenenfalls aktive Ruhezeit. Wird die Erinnerung blockiert, steht der Grund in deinem Verlauf. Es gibt dabei weder eine Weiterleitung an Fallback noch einen weiteren Systemeintrag.
+- Eine **neue kritische Meldung** geht wie bisher sofort an alle. Eine selbst bestellte Wiederholung derselben Meldung berücksichtigt dagegen die persönlichen Zeit- und Ortsregeln.
+- Voraussetzung für die Tasten: Die HA-Person und die Companion-App auf dem Zielgerät sind mit demselben HA-Benutzerkonto verknüpft. Andere Notify-Ziele funktionieren unverändert. Eigene Push-Aktionen belegen zuerst die verfügbaren Plätze. Bereits vorgemerkte Erinnerungen überstehen einen HA-Neustart.
+
 ## Installation
 
 ### HACS

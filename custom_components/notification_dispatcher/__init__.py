@@ -111,11 +111,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     history = NotificationHistory(hass, entry.entry_id)
     await history.async_load()
-    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = NotificationDispatcher(
-        hass, entry, history
-    )
+    dispatcher = NotificationDispatcher(hass, entry, history)
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = dispatcher
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     await async_show_panel(hass)
+    dispatcher.actions.start()
     return True
 
 
@@ -128,6 +128,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     dispatcher = dispatchers.pop(entry.entry_id)
     if not dispatchers:
         hide_panel(hass)
+    if dispatcher.actions:
+        await dispatcher.actions.async_close()
     if dispatcher.history:
         await dispatcher.history.async_close()
     return True

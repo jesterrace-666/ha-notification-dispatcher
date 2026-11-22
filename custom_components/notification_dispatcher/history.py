@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from dataclasses import dataclass
+from collections.abc import Iterator
+from dataclasses import dataclass, field
 from typing import Any
+from uuid import uuid4
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_component import DATA_INSTANCES
@@ -37,6 +39,7 @@ class Delivery:
     failed: int = 0
     reason: str = "not_attempted"
     fallback: str | None = None
+    push: dict[str, Any] | None = None
 
     def private_result(self) -> dict[str, Any]:
         if self.accepted:
@@ -52,7 +55,17 @@ class Delivery:
             "reason": self.reason if status != "sent" else None,
             "fallback": self.fallback,
             "for": list(self.origins),
+            **({"_push": self.push} if self.push is not None else {}),
         }
+
+
+@dataclass(frozen=True, slots=True)
+class DispatchNote:
+    timestamp: str
+    kind: str
+    title: str
+    message: str
+    id: str = field(default_factory=lambda: uuid4().hex)
 
 
 class NotificationHistory:
@@ -70,10 +83,37 @@ class NotificationHistory:
         self._rows = await self.store.async_load() or {}
 
     def for_user(self, user_id: str) -> list[dict[str, Any]]:
-        return self._rows.get(user_id, [])[:HISTORY_LIMIT]
+        result = []
+        for row in self._rows.get(user_id, [])[:HISTORY_LIMIT]:
+            routes = []
+            for route in row["routes"]:
+                public = {k: route[k] for k in ("status", "reason", "fallback", "for")}
+                if push := route.get("_push"):
+                    public.update(
+                        {
+                            k: push[k]
+                            for k in ("read", "repeat", "repeat_reason")
+                            if k in push
+                        }
+                    )
+                    if pending := push.get("pending"):
+                        public["due"] = pending["at"]
+                routes.append(public)
+            result.append(
+                {k: row[k] for k in ("timestamp", "type", "title", "message")}
+                | {"routes": routes}
+            )
+        return result
+
+    def receipts(self, owner: str | None = None) -> Iterator[tuple[str, dict, dict]]:
+        for account in self._rows if owner is None else (owner,):
+            for row in self._rows.get(account, ()):
+                for route in row["routes"]:
+                    if push := route.get("_push"):
+                        yield account, row, push
 
     def record(
-        self, rows: list[Delivery], timestamp: str, kind: str, title: str, message: str
+        self, rows: list[Delivery], note: DispatchNote, *, stage: bool = False
     ) -> None:
         if self._closed:
             return
@@ -82,21 +122,50 @@ class NotificationHistory:
             if route.owner:
                 by_owner[route.owner].append(route.private_result())
         for owner, routes in by_owner.items():
-            entry = {
-                "timestamp": timestamp,
-                "type": kind,
-                "title": title,
-                "message": message,
-                "routes": routes,
-            }
             items = self._rows.setdefault(owner, [])
-            items.append(entry)
+            entry = next((item for item in items if item.get("_id") == note.id), None)
+            if entry is None:
+                entry = {
+                    "_id": note.id,
+                    "timestamp": note.timestamp,
+                    "type": note.kind,
+                    "title": note.title,
+                    "message": note.message,
+                    "routes": [],
+                }
+                items.append(entry)
+            if stage:
+                # A phone can answer before another recipient's notify call returns.
+                for route in routes:
+                    entry["routes"] = [
+                        r
+                        for r in entry["routes"]
+                        if r.get("_push") is not route["_push"]
+                    ]
+                    entry["routes"].append(route)
+            else:
+                entry["routes"] = routes
             # Concurrent sends can finish in a different order than they started.
             items.sort(key=lambda item: item["timestamp"], reverse=True)
-            del items[HISTORY_LIMIT:]
         if by_owner:
+            self.changed()
+
+    def changed(self) -> None:
+        if self._closed:
+            return
+        for items in self._rows.values():
+            items[HISTORY_LIMIT:] = [
+                row
+                for row in items[HISTORY_LIMIT:]
+                if any(r.get("_push", {}).get("pending") for r in row["routes"])
+            ]
+        self._changed = True
+        self.store.async_delay_save(lambda: self._rows, 1)
+
+    async def async_flush(self) -> None:
+        if not self._closed:
             self._changed = True
-            self.store.async_delay_save(lambda: self._rows, 1)
+            await self.store.async_save(self._rows)
 
     async def async_close(self) -> None:
         self._closed = True
