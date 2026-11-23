@@ -34,6 +34,7 @@ from .config_flow_helpers import (
 )
 from .const import (
     CONF_ALWAYS_NOTIFY,
+    CONF_DAY_WINDOWS,
     CONF_GROUP_ID,
     CONF_GROUPS,
     CONF_NAME,
@@ -302,13 +303,14 @@ class NotificationDispatcherOptionsFlow(config_entries.OptionsFlowWithReload):
                     data_schema=_profile_schema(
                         self.hass,
                         self._groups,
-                        profile=user_input,
+                        profile=({**user_input, CONF_DAY_WINDOWS: profile[CONF_DAY_WINDOWS]}
+                                 if CONF_DAY_WINDOWS in profile else user_input),
                         include_time_windows=False,
                     ),
                     errors=errors,
                 )
 
-            if bool(user_input.get(CONF_ALWAYS_NOTIFY, False)):
+            if user_input.get(CONF_ALWAYS_NOTIFY) or CONF_DAY_WINDOWS in preview_profile:
                 return await self.async_step_edit_details_schedule(
                     {
                         CONF_WEEKDAY_WINDOW: _window_from_profile(

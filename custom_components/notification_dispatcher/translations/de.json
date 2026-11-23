@@ -55,6 +55,7 @@
         "title": "Person bearbeiten",
         "description": "Waehle eine Home-Assistant-Person und danach ein oder mehrere vorhandene Notify-Ziele aus. Falls ein Ziel nicht in der Liste steht, kannst du es weiterhin manuell eintragen. Das Ziel alle/all ist fest eingebaut und nicht loeschbar.",
         "data": {
+          "reset_personal_week": "Persönlichen Wochenplan durch Werktag- und Wochenendzeiten ersetzen",
           "person_entity_id": "Person",
           "notify_targets": "Mobile-App-Ziele",
           "enabled_types": "Zusaetzliche Nachrichtentypen",

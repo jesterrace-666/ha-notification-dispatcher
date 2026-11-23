@@ -20,6 +20,7 @@ from .const import (
     CONF_ALLOW_WEEKDAYS,
     CONF_ALLOW_WEEKENDS,
     CONF_ALWAYS_NOTIFY,
+    CONF_DAY_WINDOWS,
     CONF_DND_ENABLED,
     CONF_DND_END,
     CONF_DND_START,
@@ -41,17 +42,22 @@ from .const import (
     DOMAIN,
     OPTIONAL_NOTIFICATION_TYPES,
     TYPE_CRITICAL,
+    WEEKDAYS,
 )
 from .history import linked_user_id
 
 _CLOCK = r"(?:[01][0-9]|2[0-3]):[0-5][0-9]"
-_WINDOW = vol.Any("", vol.All(str, vol.Match(rf"\A{_CLOCK}-{_CLOCK}\Z")))
+_ACTIVE_WINDOW = vol.All(str, vol.Match(rf"\A{_CLOCK}-{_CLOCK}\Z"))
+_WINDOW = vol.Any("", _ACTIVE_WINDOW)
 _SETTINGS = vol.Schema(
     {
         vol.Required(CONF_ALWAYS_NOTIFY): bool,
         vol.Required(CONF_ONLY_WHEN_HOME): bool,
         vol.Required(CONF_WEEKDAY_WINDOW): _WINDOW,
         vol.Required(CONF_WEEKEND_WINDOW): _WINDOW,
+        vol.Optional(CONF_DAY_WINDOWS): {
+            vol.Optional(day): _ACTIVE_WINDOW for day in WEEKDAYS
+        },
         vol.Required(CONF_ENABLED_TYPES): vol.All(
             [vol.In(OPTIONAL_NOTIFICATION_TYPES)],
             vol.Length(max=len(OPTIONAL_NOTIFICATION_TYPES)),
@@ -107,6 +113,8 @@ def _snapshot(entry: ConfigEntry, profile: dict) -> dict:
             if t in profile.get(CONF_ENABLED_TYPES, [])
         ),
     }
+    if CONF_DAY_WINDOWS in profile:
+        values[CONF_DAY_WINDOWS] = dict(profile[CONF_DAY_WINDOWS])
     quiet = window(
         CONF_DND_WINDOW,
         CONF_DND_ENABLED,
@@ -185,6 +193,20 @@ def websocket_update_preferences(
     if msg["revision"] != current["revision"]:
         connection.send_error(
             msg["id"], "preferences_changed", "Personal preferences have changed"
+        )
+        return
+    if (
+        CONF_DAY_WINDOWS in profile
+        and CONF_DAY_WINDOWS not in settings
+        and any(
+            settings[k] != current["settings"][k]
+            for k in (CONF_WEEKDAY_WINDOW, CONF_WEEKEND_WINDOW)
+        )
+    ):
+        connection.send_error(
+            msg["id"],
+            "preferences_changed",
+            "Reload the weekly schedule before editing it",
         )
         return
     settings[CONF_ENABLED_TYPES] = sorted(

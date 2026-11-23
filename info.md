@@ -25,7 +25,7 @@ Built-in groups:
 
 **Herald 1.7:** Mark a Companion push as read or be reminded in 5, 30, or 60 minutes directly from the notification. Personal reminders recheck the recipient's current rules, go only to the requesting device, and never create another system or fallback notification. No changes to automations are required.
 
-**Herald 1.8:** Open **Notification history → My availability** to manage your own delivery hours, home-only rule and optional notification types. Changes apply immediately to the same profile used by the dispatcher; no administrator access or restart is required to save preferences.
+**Herald 1.9:** Open the **Benachrichtigen** sidebar panel and select **My availability**. Edit one day or several together using the weekly picker, choose precise times or an all-day window, or switch to 24/7. Existing schedules and sidebar bookmarks continue to work. Personal preferences take effect on save without administrator access or a restart.
 
 Release highlight:
 

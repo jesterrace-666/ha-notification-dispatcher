@@ -30,6 +30,21 @@ async def async_setup_panel_api(hass: HomeAssistant) -> None:
                 str(Path(__file__).with_name("availability.js")),
                 False,
             ),
+            StaticPathConfig(
+                "/notification_dispatcher_static/panel-ui.js",
+                str(Path(__file__).with_name("panel-ui.js")),
+                False,
+            ),
+            StaticPathConfig(
+                "/notification_dispatcher_static/week-picker.js",
+                str(Path(__file__).with_name("week-picker.js")),
+                False,
+            ),
+            StaticPathConfig(
+                "/notification_dispatcher_static/icon.png",
+                str(Path(__file__).with_name("brand") / "icon.png"),
+                True,
+            ),
         ]
     )
     websocket_api.async_register_command(hass, websocket_history)
@@ -43,8 +58,8 @@ async def async_show_panel(hass: HomeAssistant) -> None:
             hass,
             PANEL_PATH,
             PANEL_NAME,
-            sidebar_title="Notification Verlauf",
-            sidebar_icon="mdi:message-text-clock-outline",
+            sidebar_title="Benachrichtigen",
+            sidebar_icon="mdi:email-fast-outline",
             module_url=ASSET_URL,
             require_admin=False,
         )

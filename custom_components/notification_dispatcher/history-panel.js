@@ -1,8 +1,11 @@
 import "./availability.js";
+import { controls, glyph } from "./panel-ui.js";
 
 const words = {
   de: {
-    title: "Notification Verlauf", refresh: "Aktualisieren", filter: "Status",
+    title: "Benachrichtigen", refresh: "Aktualisieren", filter: "Status",
+    one: "Nachricht", many: "Nachrichten", day_disabled: "Dieser Tag ist im Wochenplan frei",
+    outside_day_window: "Außerhalb des persönlichen Zeitfensters",
     history: "Verlauf", availability: "Meine Erreichbarkeit",
     all: "Alle Vorgänge", problems: "Nicht zugestellt", forwarded: "Fallback",
     loading: "Verlauf wird geladen …", empty: "Noch keine Nachrichten für dich.",
@@ -29,7 +32,9 @@ const words = {
     invalid_profile: "Empfängerregeln ungültig",
   },
   en: {
-    title: "Notification history", refresh: "Refresh", filter: "Status",
+    title: "Notifications", refresh: "Refresh", filter: "Status",
+    one: "notification", many: "notifications", day_disabled: "Delivery is off for this day",
+    outside_day_window: "Outside your delivery window",
     history: "History", availability: "My availability",
     all: "All activity", problems: "Not delivered", forwarded: "Fallback",
     loading: "Loading history …", empty: "No notifications for you yet.",
@@ -67,24 +72,35 @@ class NotificationDispatcherHistory extends HTMLElement {
     this.attachShadow({ mode: "open" });
     this.shadowRoot.innerHTML = `
       <style>
-        :host{display:block;height:100%;overflow:auto;box-sizing:border-box;background:var(--primary-background-color,#fafafa);color:var(--primary-text-color,#202124);font:inherit}
-        *,*::before,*::after{box-sizing:border-box} header{position:sticky;top:0;z-index:1;display:flex;align-items:center;gap:12px;min-height:56px;padding:4px 16px;background:var(--app-header-background-color,var(--card-background-color,white));color:var(--app-header-text-color,var(--primary-text-color));border-bottom:1px solid var(--divider-color,#ddd)}
-        h1{font-size:20px;line-height:1.3;font-weight:500;margin:0;flex:1;overflow-wrap:anywhere} button{background:transparent;color:inherit;border:0;width:44px;height:44px;cursor:pointer}
-        main{max-width:820px;margin:auto;padding:20px clamp(12px,3%,28px) 40px} nav{display:flex;justify-content:flex-end} select{font:inherit;font-size:14px;max-width:100%;padding:7px;color:inherit;background:var(--card-background-color,white);border:1px solid var(--divider-color,#ccc);border-radius:4px}
-        [hidden]{display:none!important}.tabs{display:flex;border-bottom:1px solid var(--divider-color,#ddd);gap:8px;margin:0 0 18px}
-        .tabs button{width:auto;max-width:60%;height:auto;min-height:44px;padding:5px 10px;border-bottom:2px solid transparent;font:inherit;font-size:15px;overflow-wrap:anywhere}
-        .tabs button[aria-selected=true]{color:var(--primary-text-color,#202124);border-color:var(--primary-color,#0288d1);font-weight:600}
-        h2{font-size:14px;font-weight:500;color:var(--secondary-text-color,#62676c);margin:20px 0 2px} article{display:grid;grid-template-columns:28px minmax(0,1fr) auto;align-items:start;gap:8px 12px;padding:15px 0;border-bottom:1px solid var(--divider-color,#ddd)}
-        article ha-icon{margin-top:2px;color:var(--info-color,#297da0)} article.warning ha-icon{color:var(--warning-color,#b26813)} article.critical ha-icon{color:var(--error-color,#b93441)} article.reminder ha-icon{color:var(--secondary-text-color,#68626f)}
-        strong{display:block;overflow-wrap:anywhere;font-weight:600} p{overflow-wrap:anywhere;white-space:pre-wrap;margin:5px 0;line-height:1.45} time,.type,.detail{color:var(--secondary-text-color,#60656a);font-size:13px}
-        .route{margin-top:7px;font-size:14px;overflow-wrap:anywhere} time{white-space:nowrap} .empty{padding:24px 0;color:var(--secondary-text-color,#60656a)}
-        @media(max-width:440px){main{padding:12px}article{column-gap:7px}header{gap:6px;padding-inline:6px}}
+        :host{display:block;height:100%;overflow:auto;box-sizing:border-box;--nd-bg:var(--primary-background-color,#f5f7f8);--nd-surface:var(--card-background-color,#fff);--nd-text:var(--primary-text-color,#1d292f);--nd-muted:var(--secondary-text-color,#56676e);--nd-line:var(--divider-color,#d8e1e3);--nd-border:color-mix(in srgb,var(--nd-muted) 45%,var(--nd-surface));--nd-accent:var(--primary-color,#058398);--nd-action:color-mix(in srgb,var(--nd-accent) 57%,#0c4750);--nd-on-action:#fff;--nd-ink:color-mix(in srgb,var(--nd-accent) 55%,var(--nd-text));--nd-tint:color-mix(in srgb,var(--nd-accent) 12%,var(--nd-surface));--nd-mark:color-mix(in srgb,var(--nd-accent) 46%,var(--nd-line));--nd-hover:color-mix(in srgb,var(--nd-text) 6%,var(--nd-surface));--nd-off:color-mix(in srgb,var(--nd-text) 12%,var(--nd-surface));--nd-error:var(--error-color,#bd423e);color:var(--nd-text);background:var(--nd-bg);font:400 15px/1.45 var(--ha-font-family-body,var(--primary-font-family,Roboto,system-ui,sans-serif));letter-spacing:0}
+        ${controls}
+        header{position:sticky;top:0;z-index:2;background:var(--nd-surface);border-bottom:1px solid var(--nd-line)}.toolbar{display:flex;align-items:center;min-height:58px;padding:5px 18px;gap:10px}
+        .brand{width:31px;height:31px;border-radius:7px;display:block}h1{font-size:20px;font-weight:600;line-height:1.2;margin:0;flex:1;overflow-wrap:anywhere}
+        .band{background:var(--nd-surface);border-bottom:1px solid var(--nd-line)}.inner,main{width:min(100%,1016px);margin-inline:auto;padding-inline:26px}
+        .tabs{display:flex;gap:16px}.tabs button{display:flex;align-items:center;justify-content:center;gap:7px;min-height:47px;padding:4px 5px;border-bottom:3px solid transparent;font-size:14px;font-weight:600;color:var(--nd-muted)}
+        .tabs button ha-icon{--mdc-icon-size:18px}.tabs button[aria-selected=true]{color:var(--nd-ink);border-color:var(--nd-ink)}
+        main{padding-top:26px;padding-bottom:40px}.feed-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+        .feed-title{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}h2{font-size:21px;font-weight:600;line-height:1.3;margin:0}
+        .count,.type,time,.detail{font-size:13px;color:var(--nd-muted)}.filter{position:relative;display:inline-flex;align-items:center;min-height:38px;color:var(--nd-muted)}
+        .filter select{appearance:none;max-width:100%;min-height:38px;padding:5px 30px 5px 34px;color:var(--nd-text);background:var(--nd-surface);border:1px solid var(--nd-border);border-radius:6px;font-size:14px}
+        .filter ha-icon{pointer-events:none;position:absolute;left:9px;--mdc-icon-size:17px}.filter ha-icon:last-child{left:auto;right:7px}
+        section>h3{font-size:13px;font-weight:600;color:var(--nd-muted);margin:24px 0 1px;padding:0 0 7px;border-bottom:1px solid var(--nd-line)}
+        article{--tone:var(--nd-accent);display:grid;grid-template-columns:36px minmax(0,1fr) auto;align-items:start;gap:12px;padding:16px 2px;border-bottom:1px solid var(--nd-line)}
+        article.warning{--tone:var(--warning-color,#af7213)}article.critical{--tone:var(--nd-error)}article.reminder{--tone:var(--success-color,#46856b)}
+        .stamp{width:34px;height:34px;display:grid;place-items:center;border-radius:7px;background:color-mix(in srgb,var(--tone) 13%,var(--nd-surface));color:color-mix(in srgb,var(--tone) 70%,var(--nd-text))}
+        .type{font-size:12px;font-weight:550}strong{display:block;overflow-wrap:anywhere;font-size:16px;font-weight:600}p{overflow-wrap:anywhere;white-space:pre-wrap;margin:3px 0 7px}
+        time{font-variant-numeric:tabular-nums;white-space:nowrap}.route{display:flex;align-items:baseline;gap:6px;font-size:13px;font-weight:550;overflow-wrap:anywhere;margin-top:6px}
+        .route::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;flex:none;background:var(--nd-muted)}.route.sent::before{background:var(--success-color,#439476)}.route.failed::before{background:var(--nd-error)}.route.partial::before,.route.blocked::before{background:var(--warning-color,#be851a)}
+        .detail{padding-left:13px;overflow-wrap:anywhere}.empty{display:flex;align-items:center;gap:10px;padding:26px 0;color:var(--nd-muted);border-top:1px solid var(--nd-line)}
+        @media(max-width:600px){.inner,main{padding-inline:16px}.toolbar{padding-inline:8px;gap:7px}main{padding-top:18px}.tabs{gap:10px}.tabs button{padding-inline:2px}.feed-head{margin-bottom:10px;gap:8px}article{grid-template-columns:30px minmax(0,1fr) auto;gap:7px}.stamp{width:28px;height:28px}.feed-title{gap:5px}.count{font-size:12px}}
       </style>
-      <header><ha-menu-button></ha-menu-button><h1></h1><button id="refresh" type="button"><ha-icon icon="mdi:refresh"></ha-icon></button></header>
+      <header><div class="toolbar"><ha-menu-button></ha-menu-button><img class="brand" width="31" height="31" alt="" src="${new URL("./icon.png", import.meta.url).href}"><h1></h1>
+        <button class="icon-btn" id="refresh" type="button">${glyph("refresh")}</button></div></header>
+      <div class="band"><div class="inner tabs" role="tablist"><button type="button" id="tab-history" role="tab" aria-controls="history">${glyph("history")}<span></span></button>
+        <button type="button" id="tab-availability" role="tab" aria-controls="availability">${glyph("calendar-clock-outline")}<span></span></button></div></div>
       <main>
-        <div class="tabs" role="tablist"><button type="button" id="tab-history" role="tab" aria-controls="history"></button>
-          <button type="button" id="tab-availability" role="tab" aria-controls="availability"></button></div>
-        <div id="history" role="tabpanel" aria-labelledby="tab-history"><nav><select></select></nav><section aria-live="polite"></section></div>
+        <div id="history" role="tabpanel" aria-labelledby="tab-history"><div class="feed-head"><div class="feed-title"><h2></h2><span class="count"></span></div>
+          <label class="filter">${glyph("filter-variant")}<select></select>${glyph("chevron-down")}</label></div><section aria-live="polite"></section></div>
         <notification-dispatcher-availability id="availability" role="tabpanel" aria-labelledby="tab-availability" hidden></notification-dispatcher-availability>
       </main>`;
     this.$ = (selector) => this.shadowRoot.querySelector(selector);
@@ -182,12 +198,14 @@ class NotificationDispatcherHistory extends HTMLElement {
     this.$(".tabs").setAttribute("aria-label", w.title);
     for (const name of ["history", "availability"]) {
       const tab = this.$("#tab-" + name);
-      tab.textContent = w[name];
+      tab.querySelector("span").textContent = w[name];
       tab.tabIndex = this.view === name ? 0 : -1;
       tab.setAttribute("aria-selected", String(this.view === name));
     }
     this.$("#history").hidden = this.view !== "history";
     this.$("#availability").active = this.view === "availability";
+    this.$(".feed-title h2").textContent = w.history;
+    this.$(".count").textContent = this.phase === "ready" ? this.rows.length + " " + w[this.rows.length === 1 ? "one" : "many"] : "";
     const select = this.$("select");
     select.setAttribute("aria-label", w.filter);
     const filter = select.value || "all";
@@ -205,7 +223,7 @@ class NotificationDispatcherHistory extends HTMLElement {
       if (!routes.length) continue;
       const date = new Date(row.timestamp);
       const group = day.format(date);
-      if (currentDay !== group) list.append(element("h2", group));
+      if (currentDay !== group) list.append(element("h3", group));
       currentDay = group;
       const article = element("article", null, row.type);
       const icon = element("ha-icon");
@@ -215,7 +233,7 @@ class NotificationDispatcherHistory extends HTMLElement {
       body.append(element("span", w[row.type], "type"), element("strong", row.title || w.untitled), element("p", row.message));
       for (const route of routes) {
         const prefix = route.for.length ? "FB: " + route.for.map(name => "@" + name.replace(/\s+/g, "_")).join(" ") + " · " : "";
-        body.append(element("div", prefix + w[route.status], "route"));
+        body.append(element("div", prefix + w[route.status], "route " + route.status));
         const reason = route.reason && route.reason !== "not_attempted" ? w[route.reason] : "";
         const fb = route.fallback ? w["fb_" + route.fallback] : !route.for.length && route.status !== "sent" ? w.fb_none : "";
         if (reason) body.append(element("div", reason, "detail"));
@@ -229,12 +247,15 @@ class NotificationDispatcherHistory extends HTMLElement {
       }
       const time = element("time", clock.format(date));
       time.dateTime = row.timestamp;
-      article.append(icon, body, time);
+      const stamp = element("div", null, "stamp");
+      stamp.append(icon);
+      article.append(stamp, body, time);
       list.append(article);
     }
     if (!list.childElementCount) {
       const state = this.phase === "ready" ? (this.rows.length ? "noMatch" : "empty") : this.phase;
-      list.append(element("p", w[state], "empty"));
+      const empty = element("div", null, "empty");
+      empty.innerHTML = glyph("email-outline"); empty.append(element("span", w[state])); list.append(empty);
     }
   }
 }

@@ -21,6 +21,7 @@ from homeassistant.helpers.selector import (
 
 from .const import (
     CONF_ALWAYS_NOTIFY,
+    CONF_DAY_WINDOWS,
     CONF_ALLOW_WEEKDAYS,
     CONF_ALLOW_WEEKENDS,
     CONF_DND_ENABLED,
@@ -57,6 +58,7 @@ TARGET_ALL_ALIASES = {"all", "alle"}
 _ALWAYS_WINDOW_ALIASES = {"24/7", "24h", "always", "immer", "ganztags"}
 _LOGGER = logging.getLogger(__name__)
 CONF_MEMBER_GROUPS = "member_groups"
+CONF_RESET_WEEK = "reset_personal_week"
 
 
 class InvalidTimeWindow(ValueError):
@@ -128,6 +130,8 @@ def _profile_schema(
         ): BooleanSelector(),
     }
 
+    if CONF_DAY_WINDOWS in profile:
+        schema[vol.Optional(CONF_RESET_WEEK, default=bool(profile.get(CONF_RESET_WEEK)))] = BooleanSelector()
     if include_time_windows:
         schema.update(_profile_schedule_schema_fields(profile))
 
@@ -249,6 +253,9 @@ def _profile_from_user_input(
             CONF_WEEKEND_WINDOW,
         ),
         **quiet,
+        **({CONF_DAY_WINDOWS: dict(existing[CONF_DAY_WINDOWS])}
+           if existing.get(CONF_PERSON_ENTITY_ID) == person_entity_id
+           and CONF_DAY_WINDOWS in existing and not user_input.get(CONF_RESET_WEEK) else {}),
     }
 
 

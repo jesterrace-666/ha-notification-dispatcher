@@ -33,9 +33,9 @@ Die Action erwartet im Kern:
 3. `type`: `critical`, `info`, `warning` oder `reminder`
 4. `target`: Personen, Dispatcher-Gruppen, `alle` oder `system`. Mehrere Ziele sind kombinierbar. Bei `critical` erreicht die Nachricht immer alle konfigurierten Personen.
 
-## Notification Verlauf
+## Benachrichtigen
 
-Unter **Seitenleiste → Notification Verlauf** siehst du die letzten 50 Dispatcher-Nachrichten, die für dich bestimmt waren, einschließlich weitergeleiteter und nicht zugestellter Nachrichten. Es ist keine Änderung an bestehenden Automationen nötig. Der Verlauf beginnt nach dem Update auf 1.6.0; Testläufe und reine Systemmeldungen erzeugen keinen persönlichen Eintrag.
+Unter **Seitenleiste → Benachrichtigen → Verlauf** siehst du die letzten 50 Dispatcher-Nachrichten, die für dich bestimmt waren, einschließlich weitergeleiteter und nicht zugestellter Nachrichten. Bestehende Lesezeichen auf `/notification-verlauf` funktionieren weiterhin. Es ist keine Änderung an bestehenden Automationen nötig. Der Verlauf beginnt nach dem Update auf 1.6.0; Testläufe und reine Systemmeldungen erzeugen keinen persönlichen Eintrag.
 
 - Dein HA-Benutzerkonto muss mit deiner konfigurierten HA-Person verknüpft sein. Ohne diese Zuordnung bleibt der Verlauf leer. Jeder sieht nur seine eigenen Nachrichten, auch Administratoren. Ein später verknüpftes Konto übernimmt keinen fremden Verlauf.
 - Eine blockierte Nachricht nennt den Grund (etwa Ruhezeit, Zeitfenster oder Zuhause-Regel) und den tatsächlichen Ausgang der Weiterleitung. „Übergeben“ bedeutet, dass der Notify-Aufruf erfolgreich war; es ist keine Empfangsbestätigung vom Handy.
@@ -44,9 +44,13 @@ Unter **Seitenleiste → Notification Verlauf** siehst du die letzten 50 Dispatc
 
 ### Meine Erreichbarkeit
 
-Unter **Notification Verlauf → Meine Erreichbarkeit** kannst du ab **1.8.0 Herald** dein eigenes Dispatcher-Profil ändern, auch ohne Adminrechte. Wähle **Rund um die Uhr (24/7)** oder stelle mit den Uhrzeitwählern getrennte Fenster für Werktage und Wochenende ein. Ein abgewählter Tagesblock bleibt ohne reguläre Zustellung. **Nur wenn zuhause** gilt auch bei 24/7. Info, Warnung und Erinnerung lassen sich einzeln auswählen; neue kritische Meldungen gehen weiterhin immer durch.
+Unter **Benachrichtigen → Meine Erreichbarkeit** bearbeitest du dein eigenes Dispatcher-Profil, auch ohne Adminrechte. Ab **1.9.0 Herald** zeigt der **Wochenplan** alle sieben Tage. Tippe auf einen Tag, um nur diesen zu ändern, oder auf ein Zeitfenster, um alle zugehörigen Tage gemeinsam zu bearbeiten. **Zeitfenster hinzufügen** bietet freie Mehrfachauswahl sowie die Vorauswahl **Mo–Fr**, **Sa–So** und **Alle Tage**. Jeder Tag kann ein eigenes Fenster haben. Beim Übernehmen siehst du, welche Tage aus einem anderen Fenster übernommen werden.
+
+Wähle Anfang und Ende minutengenau oder **Ganztägig**. Ein Fenster Montag 22:00 bis 06:00 gilt bis Dienstagmorgen, nicht schon Montagfrüh. Ohne eigenes Fenster gibt es nur dann eine reguläre Zustellung, wenn das Fenster des Vortags noch läuft. Bestehende Werktag-/Wochenendpläne behalten bis zur ersten Zeitänderung ihr bisheriges Verhalten. Mit **24/7** pausierst du den Wochenplan, ohne ihn zu verlieren. **Nur wenn zuhause** gilt weiterhin; Info, Warnung und Erinnerung sind einzeln wählbar, neue kritische Meldungen gehen immer durch.
 
 **Speichern** wirkt sofort, auch für Fallback und bereits vorgemerkte persönliche Erinnerungen. 24/7 blendet die Zeitfelder aus und behält die zuletzt gespeicherten Fenster. Eine noch wirksame Ruhezeit aus einem älteren Profil wird angezeigt und kann ausdrücklich aufgehoben werden. Geräte, Gruppen und Personenzuordnung bleiben in der Integrationsverwaltung. Ohne eindeutige Verknüpfung deines HA-Kontos mit einer Dispatcher-Person lässt sich hier kein Profil bearbeiten.
+
+Vorschau mit Beispieldaten: [Wochenplan auf dem Desktop](docs/wochenplan.png) · [Tages- und Uhrzeitpicker auf dem Smartphone](docs/tagespicker.png).
 
 ### Direkt auf dem Handy antworten
 

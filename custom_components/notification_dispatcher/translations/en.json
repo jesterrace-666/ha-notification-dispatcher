@@ -55,6 +55,7 @@
         "title": "Edit person",
         "description": "Choose a Home Assistant person and then select one or more existing notify targets. If a target is not listed, you can still enter it manually. The all/alle target is built in and cannot be deleted.",
         "data": {
+          "reset_personal_week": "Replace the personal week plan with weekday and weekend hours",
           "person_entity_id": "Person",
           "notify_targets": "Mobile app targets",
           "enabled_types": "Additional notification types",
