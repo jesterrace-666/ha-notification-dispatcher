@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from copy import deepcopy
 from typing import Any
 
 import voluptuous as vol
@@ -83,6 +84,7 @@ class NotificationDispatcherOptionsFlow(config_entries.OptionsFlowWithReload):
         """Initialize the options flow."""
         self._selected_profile_id: str | None = None
         self._pending_profile_input: dict[str, Any] | None = None
+        self._edit_snapshot: dict[str, Any] | None = None
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None):
         """Show the options menu."""
@@ -272,6 +274,8 @@ class NotificationDispatcherOptionsFlow(config_entries.OptionsFlowWithReload):
         if profile is None:
             return await self.async_step_init()
 
+        if user_input is not None and self._edit_snapshot != profile:
+            return self._edit_form(profile, changed=True)
         errors: dict[str, str] = {}
         if user_input is not None:
             self._pending_profile_input = dict(user_input)
@@ -321,7 +325,11 @@ class NotificationDispatcherOptionsFlow(config_entries.OptionsFlowWithReload):
                 )
             return await self.async_step_edit_details_schedule()
 
+        return self._edit_form(profile)
+
+    def _edit_form(self, profile: dict[str, Any], *, changed: bool = False):
         self._pending_profile_input = None
+        self._edit_snapshot = deepcopy(profile)
         return self.async_show_form(
             step_id="edit_details",
             data_schema=_profile_schema(
@@ -330,7 +338,7 @@ class NotificationDispatcherOptionsFlow(config_entries.OptionsFlowWithReload):
                 profile=profile,
                 include_time_windows=False,
             ),
-            errors=errors,
+            errors={"base": "profile_changed"} if changed else {},
         )
 
     async def async_step_edit_details_schedule(
@@ -341,6 +349,8 @@ class NotificationDispatcherOptionsFlow(config_entries.OptionsFlowWithReload):
         if profile is None:
             return await self.async_step_init()
 
+        if self._edit_snapshot != profile:
+            return self._edit_form(profile, changed=True)
         base_input = self._pending_profile_input
         if base_input is None:
             return await self.async_step_edit_details()

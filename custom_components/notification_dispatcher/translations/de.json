@@ -118,6 +118,7 @@
       }
     },
     "error": {
+      "profile_changed": "Das Profil wurde inzwischen geändert. Die aktuellen Einstellungen werden angezeigt. Bitte prüfe sie erneut.",
       "missing_notify_target": "Fuege mindestens ein Notify-Ziel hinzu.",
       "missing_person": "Waehle eine Person aus.",
       "duplicate_person": "Diese Person ist bereits im Dispatcher angelegt.",

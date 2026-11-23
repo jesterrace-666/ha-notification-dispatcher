@@ -23,6 +23,9 @@ from .const import (
     CONF_ALWAYS_NOTIFY,
     CONF_ALLOW_WEEKDAYS,
     CONF_ALLOW_WEEKENDS,
+    CONF_DND_ENABLED,
+    CONF_DND_START,
+    CONF_DND_END,
     CONF_DND_WINDOW,
     CONF_ENABLED_TYPES,
     CONF_GROUP_ID,
@@ -218,9 +221,10 @@ def _profile_from_user_input(
         DEFAULT_WEEKEND_WINDOW,
     )
     always_notify = bool(user_input.get(CONF_ALWAYS_NOTIFY, False))
-    if always_notify:
-        weekday_window = "00:00-23:59"
-        weekend_window = "00:00-23:59"
+    # A device or group edit must not erase the user's saved windows or legacy DND.
+    quiet = {CONF_DND_WINDOW: ""}
+    if existing and existing.get(CONF_PERSON_ENTITY_ID) == person_entity_id:
+        quiet = {k: existing[k] for k in (CONF_DND_WINDOW, CONF_DND_ENABLED, CONF_DND_START, CONF_DND_END) if k in existing}
 
     return {
         CONF_PROFILE_ID: existing.get(CONF_PROFILE_ID, uuid4().hex),
@@ -244,9 +248,7 @@ def _profile_from_user_input(
             DEFAULT_WEEKEND_WINDOW,
             CONF_WEEKEND_WINDOW,
         ),
-        # Quiet hours input was removed from the UI.
-        # Keep this key empty to disable hidden DND blocking.
-        CONF_DND_WINDOW: "",
+        **quiet,
     }
 
 
