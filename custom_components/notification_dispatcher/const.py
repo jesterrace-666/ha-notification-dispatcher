@@ -32,6 +32,8 @@ CONF_DND_START = "dnd_start"
 CONF_DND_END = "dnd_end"
 CONF_WEEKDAY_WINDOW = "weekday_window"
 CONF_WEEKEND_WINDOW = "weekend_window"
+CONF_DAY_WINDOWS = "day_windows"
+WEEKDAYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
 CONF_DND_WINDOW = "dnd_window"
 
 ATTR_CONFIG_ENTRY_ID = "config_entry_id"

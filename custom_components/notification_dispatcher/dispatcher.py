@@ -31,6 +31,7 @@ from .const import (
     CONF_ALLOW_WEEKDAYS,
     CONF_ALLOW_WEEKENDS,
     CONF_ALWAYS_NOTIFY,
+    CONF_DAY_WINDOWS,
     CONF_DND_ENABLED,
     CONF_DND_END,
     CONF_DND_START,
@@ -69,6 +70,7 @@ from .const import (
     TYPE_INFO,
     TYPE_REMINDER,
     TYPE_WARNING,
+    WEEKDAYS,
 )
 from .history import Delivery, DispatchNote, NotificationHistory, linked_user_id
 from .push_actions import PushActions, endpoint
@@ -95,6 +97,8 @@ SCOPE_ICON_ALL = "🌐"
 SCOPE_ICON_GROUP = "👥"
 SCOPE_ICON_PERSONAL = "👤"
 FALLBACK_DELIVERY_REASONS = {
+    "day_disabled",
+    "outside_day_window",
     "person_not_home",
     "weekday_disabled",
     "outside_weekday_window",
@@ -362,7 +366,11 @@ class NotificationDispatcher:
         now_time = now.time().replace(tzinfo=None)
         is_weekday = now.weekday() < 5
 
-        if is_weekday:
+        if CONF_DAY_WINDOWS in profile:
+            reason = _weekly_denial(profile[CONF_DAY_WINDOWS], now.weekday(), now_time)
+            if reason:
+                return DeliveryDecision(False, reason)
+        elif is_weekday:
             weekday_window = _profile_time_window(
                 profile,
                 CONF_WEEKDAY_WINDOW,
@@ -1049,6 +1057,23 @@ def _parse_time(value: Any, fallback: str) -> time:
         raise ServiceValidationError(f"Invalid time value: {raw}") from err
 
     return time(hour=hour, minute=minute, second=second)
+
+
+def _weekly_denial(windows: dict[str, str], weekday: int, at: time) -> str | None:
+    """An overnight window belongs to its start day, including Sunday into Monday."""
+    minute = at.strftime("%H:%M")
+    previous = windows.get(WEEKDAYS[weekday - 1])
+    if previous:
+        start, end = previous.split("-")
+        if start > end and minute <= end:
+            return None
+    today = windows.get(WEEKDAYS[weekday])
+    if not today:
+        return "day_disabled"
+    start, end = today.split("-")
+    if start == end or start <= minute <= end or (start > end and minute >= start):
+        return None
+    return "outside_day_window"
 
 
 def _time_in_allowed_window(now_time: time, start: Any, end: Any) -> bool:

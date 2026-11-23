@@ -13,7 +13,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Install browser test driver
-        run: npm install --no-save --package-lock=false --ignore-scripts playwright-core@1.62.1
+        run: npm install --no-save --package-lock=false --ignore-scripts playwright-core@1.62.1 @mdi/js@7.4.47
       - name: Test desktop and mobile history panel
         env:
           CHROME_PATH: /usr/bin/google-chrome

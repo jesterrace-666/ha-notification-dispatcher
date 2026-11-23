@@ -6,6 +6,7 @@ from types import MappingProxyType, SimpleNamespace
 from unittest import IsolatedAsyncioTestCase
 from unittest.mock import Mock, patch
 
+from homeassistant.components import frontend
 from homeassistant.config_entries import ConfigEntries, ConfigEntry, ConfigEntryState
 from test_notification_history import DispatcherFixture
 
@@ -116,6 +117,11 @@ class PreferenceTests(DispatcherFixture, IsolatedAsyncioTestCase):
             {"always_notify": 1},
             {"weekday_window": "25:00-08:00"},
             {"weekend_window": "08:00-24:00"},
+            {"day_windows": {"thursday": "08:00-09:00"}},
+            {"day_windows": {"thu": "25:00-09:00"}},
+            {"day_windows": {"tue": ""}},
+            {"day_windows": ["mon"]},
+            {"day_windows": {"mon": {"notify_targets": ["notify.other"]}}},
             {"weekday_window": "08:00-22:00\n"},
             {"enabled_types": ["critical"]},
             {"enabled_types": "warning"},
@@ -298,7 +304,10 @@ class PreferenceTests(DispatcherFixture, IsolatedAsyncioTestCase):
             patch.object(self.dispatcher, "entry", entry),
         ):
             result = self.save(
-                "linda", only_when_home=True, weekend_window="11:00-15:00"
+                "linda",
+                only_when_home=True,
+                weekend_window="11:00-15:00",
+                day_windows={"mon": "11:15-15:45"},
             )
             self.assertEqual(result, self.ws("linda"))
             await manager._store.async_save(manager._data_to_save())
@@ -307,3 +316,143 @@ class PreferenceTests(DispatcherFixture, IsolatedAsyncioTestCase):
         profile = restored.async_get_known_entry("test").options["profiles"][0]
         self.assertTrue(profile["only_when_home"])
         self.assertEqual(profile["weekend_window"], "11:00-15:00")
+        self.assertEqual(profile["day_windows"], {"mon": "11:15-15:45"})
+
+    async def test_sidebar_is_renamed_without_breaking_bookmarks_or_admin_scope(self):
+        panel = self.hass.data[frontend.DATA_PANELS]["notification-verlauf"]
+        self.assertEqual(panel.sidebar_title, "Benachrichtigen")
+        self.assertFalse(panel.require_admin)
+
+    async def test_daily_plan_drives_direct_fallback_and_personal_repeats(self):
+        self.profiles[0]["dnd_window"] = self.profiles[1]["dnd_window"] = ""
+        saved = self.save(
+            "linda",
+            always_notify=False,
+            day_windows={"mon": "08:30-18:00", "thu": "10:00-16:00"},
+        )
+        self.assertEqual(saved, self.ws("linda"))
+        self.save("johannes", always_notify=False, day_windows={"wed": "00:00-00:00"})
+        push = {"profile": "linda", "person": "person.linda"}
+        for day, reason, fallback in [
+            (23, None, None),
+            (24, "day_disabled", "blocked"),
+            (25, "day_disabled", "sent"),
+            (26, None, None),
+        ]:
+            with (
+                self.subTest(day=day),
+                patch(
+                    "custom_components.notification_dispatcher.dispatcher.dt_util.now",
+                    return_value=MONDAY.replace(day=day),
+                ),
+            ):
+                count = len(self.pushes["linda"])
+                await self.send()
+                route = self.rows("linda")[0]["routes"][0]
+                self.assertEqual(route["reason"], reason)
+                self.assertEqual(route["fallback"], fallback)
+                self.assertEqual(len(self.pushes["linda"]), count + (reason is None))
+                self.assertEqual(
+                    self.dispatcher.personal_push_denial(
+                        push, "linda", "info", "notify.linda"
+                    ),
+                    reason,
+                )
+        self.save("linda", day_windows={}, only_when_home=True)
+        await self.send()
+        self.assertEqual(
+            self.rows("linda")[0]["routes"][0]["reason"], "person_not_home"
+        )
+        await self.send(type="critical")
+        self.assertEqual(self.rows("linda")[0]["routes"][0]["status"], "sent")
+        self.hass.states.async_set("person.linda", "home")
+        self.save("linda", always_notify=True)
+        self.assertIsNone(
+            self.dispatcher.personal_push_denial(push, "linda", "info", "notify.linda")
+        )
+        self.assertEqual(self.ws("linda")["settings"]["day_windows"], {})
+
+    async def test_overnight_belongs_to_start_day_and_wraps_week(self):
+        self.profiles[0]["dnd_window"] = ""
+        self.save(
+            "linda",
+            always_notify=False,
+            day_windows={"mon": "21:00-06:37", "sun": "23:15-01:20"},
+        )
+        p = self.entry.options["profiles"][0]
+        for date, hour, minute, expected in [
+            (23, 1, 20, True),
+            (23, 1, 21, False),
+            (23, 3, 0, False),
+            (23, 20, 59, False),
+            (23, 21, 0, True),
+            (24, 6, 37, True),
+            (24, 6, 38, False),
+            (29, 23, 15, True),
+        ]:
+            with (
+                self.subTest(day=date, hour=hour, minute=minute),
+                patch(
+                    "custom_components.notification_dispatcher.dispatcher.dt_util.now",
+                    return_value=MONDAY.replace(
+                        day=date, hour=hour, minute=minute, second=59
+                    ),
+                ),
+            ):
+                self.assertEqual(
+                    self.dispatcher._delivery_decision(p, "info").should_deliver,
+                    expected,
+                )
+        p["dnd_window"] = "00:45-01:30"
+        with patch(
+            "custom_components.notification_dispatcher.dispatcher.dt_util.now",
+            return_value=MONDAY.replace(hour=1),
+        ):
+            self.assertEqual(
+                self.dispatcher._delivery_decision(p, "info").reason, "dnd_active"
+            )
+
+    async def test_week_survives_old_clients_and_admin_device_edits_unless_explicitly_reset(
+        self,
+    ):
+        mine = self.ws("linda")
+        plan = {"tue": "09:13-17:39"}
+        saved = self.save("linda", mine, always_notify=False, day_windows=plan)
+        self.assertNotEqual(mine["revision"], saved["revision"])
+        legacy = dict(saved["settings"])
+        del legacy["day_windows"]
+        result = self.ws(
+            "linda",
+            COMMAND + "/update",
+            revision=saved["revision"],
+            settings={**legacy, "only_when_home": True},
+        )
+        self.assertEqual(result["settings"]["day_windows"], plan)
+        rejected = self.ws(
+            "linda",
+            COMMAND + "/update",
+            revision=result["revision"],
+            settings={**legacy, "weekday_window": ""},
+        )
+        self.assertEqual(rejected["error"], "preferences_changed")
+        current = self.entry.options["profiles"][0]
+        for reset in (False, True):
+            flow = NotificationDispatcherOptionsFlow()
+            flow.hass, flow.handler, flow.flow_id = (
+                self.hass,
+                self.entry.entry_id,
+                "edit",
+            )
+            form = await flow.async_step_edit_person({"id": "linda"})
+            self.assertIn("reset_personal_week", form["data_schema"].schema)
+            answer = await flow.async_step_edit_details(
+                {**current, "reset_personal_week": reset}
+            )
+            if reset:
+                self.assertEqual(answer["step_id"], "edit_details_schedule")
+                answer = await flow.async_step_edit_details_schedule(
+                    {"weekday_window": "08:00-19:00", "weekend_window": ""}
+                )
+                self.assertNotIn("day_windows", answer["data"]["profiles"][0])
+            else:
+                self.assertEqual(answer["data"]["profiles"][0]["day_windows"], plan)
