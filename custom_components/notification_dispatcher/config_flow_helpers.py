@@ -131,7 +131,7 @@ def _profile_schema(
     }
 
     if CONF_DAY_WINDOWS in profile:
-        schema[vol.Optional(CONF_RESET_WEEK, default=False)] = BooleanSelector()
+        schema[vol.Optional(CONF_RESET_WEEK, default=bool(profile.get(CONF_RESET_WEEK)))] = BooleanSelector()
     if include_time_windows:
         schema.update(_profile_schedule_schema_fields(profile))
 

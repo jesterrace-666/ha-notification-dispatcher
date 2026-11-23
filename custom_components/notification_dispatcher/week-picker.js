@@ -16,7 +16,7 @@ const words = {
     week: "Wochenplan", hours: "Zeitfenster", add: "Zeitfenster hinzufügen", edit: "Zeitfenster bearbeiten",
     weekdays: "Mo – Fr", weekend: "Sa – So", every: "Alle Tage", individual: "Eigene Auswahl",
     preset: "Tagesauswahl", days: "Wochentage", none: "Kein Zeitfenster", empty: "Keine Zustelltage ausgewählt.",
-    allDay: "Ganztägig", from: "Von", to: "Bis", hour: "Stunde", minute: "Minute",
+    allDay: "Ganztägig", from: "Von", to: "Bis", hour: "Stunde", minute: "Minute", chooseTime: "Uhrzeit wählen",
     overnight: "Endet am Folgetag.", equal: "Gleiche Uhrzeiten: Für einen ganzen Tag „Ganztägig“ wählen.", overlaps: "Ersetzt die bisherigen Zeiten für", close: "Schließen",
     remove: "Zeitfenster entfernen", cancel: "Abbrechen", apply: "Übernehmen",
   },
@@ -26,7 +26,7 @@ const words = {
     week: "Week plan", hours: "Time windows", add: "Add time window", edit: "Edit time window",
     weekdays: "Mon – Fri", weekend: "Sat – Sun", every: "Every day", individual: "Custom",
     preset: "Day selection", days: "Days of the week", none: "No time window", empty: "No delivery days selected.",
-    allDay: "All day", from: "From", to: "Until", hour: "Hour", minute: "Minute",
+    allDay: "All day", from: "From", to: "Until", hour: "Hour", minute: "Minute", chooseTime: "Choose time",
     overnight: "Ends the following day.", equal: "Times are equal. Choose All day for a full day.", overlaps: "Replaces the existing hours for", close: "Close",
     remove: "Remove time window", cancel: "Cancel", apply: "Apply",
   },
@@ -38,7 +38,7 @@ const options = count => Array.from({length: count}, (_, i) => {
 }).join("");
 const clocks = part => `<fieldset class="clock"><legend data-i="${part}"></legend><div class="time">
   <select id="${part}-hour">${options(24)}</select><span aria-hidden="true">:</span><select id="${part}-minute">${options(60)}</select>
-  <button type="button" class="pick-clock" id="${part}-pick">${glyph("clock-outline")}</button></div></fieldset>`;
+  <label class="pick-clock">${glyph("clock-outline")}<input type="time" step="60" id="${part}-pick"></label></div></fieldset>`;
 
 class DispatcherWeekPicker extends HTMLElement {
   constructor() {
@@ -65,7 +65,9 @@ class DispatcherWeekPicker extends HTMLElement {
       .times{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px}.clock legend{margin-bottom:5px;color:var(--nd-muted);font-size:13px}
       .time{display:flex;align-items:center;gap:0;background:var(--nd-bg);border:1px solid var(--nd-border);border-radius:6px;padding:2px 4px}
       .time select{appearance:none;min-width:0;width:2.15em;height:44px;padding:0;text-align:center;font-size:18px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--nd-text);background:var(--nd-bg);border:0;border-radius:3px}
-      .time select:hover{background:var(--nd-hover)}.pick-clock{margin-left:auto;width:34px;height:42px;display:grid;place-items:center;color:var(--nd-muted);padding:0}.pick-clock ha-icon{--mdc-icon-size:17px}
+      .time select:hover{background:var(--nd-hover)}.pick-clock{position:relative;margin-left:auto;width:34px;height:42px;display:grid;place-items:center;color:var(--nd-muted)}.pick-clock ha-icon{--mdc-icon-size:17px}
+      .pick-clock input{position:absolute;inset:0;width:100%;height:100%;min-width:0;opacity:0;cursor:pointer}.pick-clock:focus-within{outline:2px solid var(--nd-ink);border-radius:3px}
+      .pick-clock input::-webkit-calendar-picker-indicator{position:absolute;inset:0;width:100%;height:100%;margin:0;cursor:pointer}
       #remove{color:var(--nd-error)}.dialog-foot .quiet-btn{padding-inline:8px}
       @media(max-width:520px){dialog{inset:auto 0 0;margin:0;width:100%;max-width:none;max-height:92dvh;border-radius:8px 8px 0 0;padding-bottom:env(safe-area-inset-bottom)}
         .dialog-body{padding:16px}.dialog-foot,.dialog-head{padding:9px 12px}.strip{gap:3px}.rule{gap:7px}.times{gap:10px}}
@@ -103,11 +105,15 @@ class DispatcherWeekPicker extends HTMLElement {
       this.paintDialog();
     };
     this.$("dialog").onchange = () => this.paintDialog();
-    for (const part of ["from","to"]) this.$("#"+part+"-pick").onclick = () => {
-      const select = this.$("#"+part+"-hour");
-      select.focus();
-      try { select.showPicker?.(); } catch { /* Native selection remains keyboard accessible. */ }
-    };
+    for (const part of ["from","to"]) {
+      const native = this.$("#"+part+"-pick");
+      native.onclick = () => { try { native.showPicker?.(); } catch { /* Keep the native input's default activation. */ } };
+      native.onchange = () => {
+        if (!native.value) return;
+        const [hh, mm] = native.value.split(":");
+        this.$("#"+part+"-hour").value = hh; this.$("#"+part+"-minute").value = mm;
+      };
+    }
     this.shadowRoot.addEventListener("input", e => e.stopPropagation());
     this.$("#apply").onclick = () => this.commit(false);
     this.$("#remove").onclick = () => this.commit(true);
@@ -169,7 +175,7 @@ class DispatcherWeekPicker extends HTMLElement {
     if (!groups.size) { const p=document.createElement("p"); p.className="empty"; p.textContent=w.empty; list.append(p); }
     for (const id of ["close","remove"]) { this.$("#"+id).title=w[id]; this.$("#"+id).setAttribute("aria-label",w[id]); }
     this.$("#preset").setAttribute("aria-label",w.preset);
-    for (const part of ["from","to"]) { const button=this.$("#"+part+"-pick"); button.title=w[part]+" · "+w.hour; button.setAttribute("aria-label",button.title); }
+    for (const part of ["from","to"]) { const input=this.$("#"+part+"-pick"); input.title=w.chooseTime+": "+w[part]; input.setAttribute("aria-label",input.title); }
     for (const part of ["from","to"]) for (const unit of ["hour","minute"]) this.$("#"+part+"-"+unit).setAttribute("aria-label",w[part]+" · "+w[unit]);
   }
   open(original, selected, trigger) {
@@ -188,6 +194,7 @@ class DispatcherWeekPicker extends HTMLElement {
     const w=this.w, chosen=dayKeys.filter(k=>this.selected.has(k)), all=this.$("#all-day").checked;
     this.$("#dialog-title").textContent=this.original.length?w.edit:w.add;
     this.$("#preset").value=presetFor(chosen);
+    for (const part of ["from","to"]) this.$("#"+part+"-pick").value = this.time(part);
     for (const [i,k] of dayKeys.entries()) this.$(".choice").children[i].setAttribute("aria-pressed",String(this.selected.has(k)));
     this.$(".times").hidden=all; this.$("#overnight").hidden=all||this.time("to")>=this.time("from");
     this.$("#equal").hidden=all||this.time("to")!==this.time("from");

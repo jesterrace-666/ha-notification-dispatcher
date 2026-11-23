@@ -303,7 +303,8 @@ class NotificationDispatcherOptionsFlow(config_entries.OptionsFlowWithReload):
                     data_schema=_profile_schema(
                         self.hass,
                         self._groups,
-                        profile=user_input,
+                        profile=({**user_input, CONF_DAY_WINDOWS: profile[CONF_DAY_WINDOWS]}
+                                 if CONF_DAY_WINDOWS in profile else user_input),
                         include_time_windows=False,
                     ),
                     errors=errors,

@@ -186,7 +186,8 @@ for (const [layout, width, height] of [["desktop", 1152, 800], ["mobile", 320, 7
     const dialog = page.getByRole("dialog");
     await dialog.getByRole("button",{name:"Donnerstag",exact:true}).click();
     await dialog.getByRole("combobox",{name:"Von · Stunde"}).selectOption("21");
-    await dialog.getByRole("combobox",{name:"Bis · Stunde"}).selectOption("06");
+    await dialog.getByLabel("Uhrzeit wählen: Bis").fill("06:25");
+    assert.equal(await dialog.getByRole("combobox",{name:"Bis · Stunde"}).inputValue(), "06");
     await dialog.getByLabel("Bis · Minute").selectOption("37");
     await dialog.getByText("Endet am Folgetag.").waitFor();
     await dialog.getByText("Ersetzt die bisherigen Zeiten für Donnerstag.").waitFor();
