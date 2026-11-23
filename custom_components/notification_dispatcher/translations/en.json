@@ -118,6 +118,7 @@
       }
     },
     "error": {
+      "profile_changed": "This profile changed while you were editing. Review its current settings before saving.",
       "missing_notify_target": "Add at least one notify target.",
       "missing_person": "Choose a person.",
       "duplicate_person": "This person is already configured in the dispatcher.",

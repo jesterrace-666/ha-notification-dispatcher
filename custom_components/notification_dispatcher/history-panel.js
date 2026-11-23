@@ -1,6 +1,9 @@
+import "./availability.js";
+
 const words = {
   de: {
     title: "Notification Verlauf", refresh: "Aktualisieren", filter: "Status",
+    history: "Verlauf", availability: "Meine Erreichbarkeit",
     all: "Alle Vorgänge", problems: "Nicht zugestellt", forwarded: "Fallback",
     loading: "Verlauf wird geladen …", empty: "Noch keine Nachrichten für dich.",
     noMatch: "Keine passenden Nachrichten.", error: "Verlauf konnte nicht geladen werden.",
@@ -27,6 +30,7 @@ const words = {
   },
   en: {
     title: "Notification history", refresh: "Refresh", filter: "Status",
+    history: "History", availability: "My availability",
     all: "All activity", problems: "Not delivered", forwarded: "Fallback",
     loading: "Loading history …", empty: "No notifications for you yet.",
     noMatch: "No matching notifications.", error: "Could not load notification history.",
@@ -67,16 +71,35 @@ class NotificationDispatcherHistory extends HTMLElement {
         *,*::before,*::after{box-sizing:border-box} header{position:sticky;top:0;z-index:1;display:flex;align-items:center;gap:12px;min-height:56px;padding:4px 16px;background:var(--app-header-background-color,var(--card-background-color,white));color:var(--app-header-text-color,var(--primary-text-color));border-bottom:1px solid var(--divider-color,#ddd)}
         h1{font-size:20px;line-height:1.3;font-weight:500;margin:0;flex:1;overflow-wrap:anywhere} button{background:transparent;color:inherit;border:0;width:44px;height:44px;cursor:pointer}
         main{max-width:820px;margin:auto;padding:20px clamp(12px,3%,28px) 40px} nav{display:flex;justify-content:flex-end} select{font:inherit;font-size:14px;max-width:100%;padding:7px;color:inherit;background:var(--card-background-color,white);border:1px solid var(--divider-color,#ccc);border-radius:4px}
+        [hidden]{display:none!important}.tabs{display:flex;border-bottom:1px solid var(--divider-color,#ddd);gap:8px;margin:0 0 18px}
+        .tabs button{width:auto;max-width:60%;height:auto;min-height:44px;padding:5px 10px;border-bottom:2px solid transparent;font:inherit;font-size:15px;overflow-wrap:anywhere}
+        .tabs button[aria-selected=true]{color:var(--primary-text-color,#202124);border-color:var(--primary-color,#0288d1);font-weight:600}
         h2{font-size:14px;font-weight:500;color:var(--secondary-text-color,#62676c);margin:20px 0 2px} article{display:grid;grid-template-columns:28px minmax(0,1fr) auto;align-items:start;gap:8px 12px;padding:15px 0;border-bottom:1px solid var(--divider-color,#ddd)}
         article ha-icon{margin-top:2px;color:var(--info-color,#297da0)} article.warning ha-icon{color:var(--warning-color,#b26813)} article.critical ha-icon{color:var(--error-color,#b93441)} article.reminder ha-icon{color:var(--secondary-text-color,#68626f)}
         strong{display:block;overflow-wrap:anywhere;font-weight:600} p{overflow-wrap:anywhere;white-space:pre-wrap;margin:5px 0;line-height:1.45} time,.type,.detail{color:var(--secondary-text-color,#60656a);font-size:13px}
         .route{margin-top:7px;font-size:14px;overflow-wrap:anywhere} time{white-space:nowrap} .empty{padding:24px 0;color:var(--secondary-text-color,#60656a)}
         @media(max-width:440px){main{padding:12px}article{column-gap:7px}header{gap:6px;padding-inline:6px}}
       </style>
-      <header><ha-menu-button></ha-menu-button><h1></h1><button type="button"><ha-icon icon="mdi:refresh"></ha-icon></button></header>
-      <main><nav><select></select></nav><section aria-live="polite"></section></main>`;
+      <header><ha-menu-button></ha-menu-button><h1></h1><button id="refresh" type="button"><ha-icon icon="mdi:refresh"></ha-icon></button></header>
+      <main>
+        <div class="tabs" role="tablist"><button type="button" id="tab-history" role="tab" aria-controls="history"></button>
+          <button type="button" id="tab-availability" role="tab" aria-controls="availability"></button></div>
+        <div id="history" role="tabpanel" aria-labelledby="tab-history"><nav><select></select></nav><section aria-live="polite"></section></div>
+        <notification-dispatcher-availability id="availability" role="tabpanel" aria-labelledby="tab-availability" hidden></notification-dispatcher-availability>
+      </main>`;
     this.$ = (selector) => this.shadowRoot.querySelector(selector);
-    this.$("button").onclick = () => this.load();
+    this.view = "history";
+    this.$("#refresh").onclick = () => this.load();
+    for (const tab of ["history", "availability"]) {
+      this.$("#tab-" + tab).onclick = () => this.selectView(tab);
+      this.$("#tab-" + tab).onkeydown = e => {
+        if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
+        e.preventDefault();
+        const next = e.key === "Home" ? "history" : e.key === "End" ? "availability" : tab === "history" ? "availability" : "history";
+        this.selectView(next);
+        this.$("#tab-" + next).focus();
+      };
+    }
     this.$("select").onchange = () => this.render();
     this.onVisible = () => { if (!document.hidden) this.load(); };
     this.epoch = 0;
@@ -102,12 +125,22 @@ class NotificationDispatcherHistory extends HTMLElement {
     this.busy = false;
     this.render();
   }
+  selectView(view) {
+    this.view = view;
+    this.render();
+    if (view === "history") this.load();
+  }
   set narrow(value) { this.$("ha-menu-button").narrow = value; }
   set hass(value) {
     const old = this._hass;
     const changed = old?.user?.id !== value?.user?.id || old?.connection !== value?.connection;
     this._hass = value;
     this.$("ha-menu-button").hass = value;
+    if (changed) {
+      this.view = "history";
+      this.$("#availability").active = false;
+    }
+    this.$("#availability").hass = value;
     if (changed) {
       this.reset();
       this.load();
@@ -116,7 +149,7 @@ class NotificationDispatcherHistory extends HTMLElement {
     }
   }
   async load() {
-    if (!this.isConnected || !this._hass?.user?.id || this.busy) return;
+    if (this.view !== "history" || !this.isConnected || !this._hass?.user?.id || this.busy) return;
     const epoch = this.epoch;
     this.busy = true;
     try {
@@ -142,9 +175,19 @@ class NotificationDispatcherHistory extends HTMLElement {
     const day = new Intl.DateTimeFormat(locale, { dateStyle: "long", timeZone: zone });
     const clock = new Intl.DateTimeFormat(locale, { timeStyle: "short", timeZone: zone });
     this.$("h1").textContent = w.title;
-    const refresh = this.$("button");
+    const refresh = this.$("#refresh");
     refresh.title = w.refresh;
     refresh.setAttribute("aria-label", w.refresh);
+    refresh.hidden = this.view !== "history";
+    this.$(".tabs").setAttribute("aria-label", w.title);
+    for (const name of ["history", "availability"]) {
+      const tab = this.$("#tab-" + name);
+      tab.textContent = w[name];
+      tab.tabIndex = this.view === name ? 0 : -1;
+      tab.setAttribute("aria-selected", String(this.view === name));
+    }
+    this.$("#history").hidden = this.view !== "history";
+    this.$("#availability").active = this.view === "availability";
     const select = this.$("select");
     select.setAttribute("aria-label", w.filter);
     const filter = select.value || "all";

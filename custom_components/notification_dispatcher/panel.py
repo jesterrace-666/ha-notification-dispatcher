@@ -11,6 +11,7 @@ from homeassistant.core import HomeAssistant, callback
 
 from .const import DOMAIN
 from .history import HISTORY_LIMIT
+from .preferences import websocket_preferences, websocket_update_preferences
 
 PANEL_PATH = "notification-verlauf"
 PANEL_NAME = "notification-dispatcher-history"
@@ -23,10 +24,17 @@ async def async_setup_panel_api(hass: HomeAssistant) -> None:
         [
             StaticPathConfig(
                 ASSET_URL, str(Path(__file__).with_name("history-panel.js")), False
-            )
+            ),
+            StaticPathConfig(
+                "/notification_dispatcher_static/availability.js",
+                str(Path(__file__).with_name("availability.js")),
+                False,
+            ),
         ]
     )
     websocket_api.async_register_command(hass, websocket_history)
+    websocket_api.async_register_command(hass, websocket_preferences)
+    websocket_api.async_register_command(hass, websocket_update_preferences)
 
 
 async def async_show_panel(hass: HomeAssistant) -> None:

@@ -42,6 +42,12 @@ Unter **Seitenleiste → Notification Verlauf** siehst du die letzten 50 Dispatc
 - Der Fallback-Push beginnt z. B. mit **FB: @Linda**. Bei mehreren ursprünglichen Empfängern bleibt der Titel kurz (**FB: @Linda +1**); im eigenen Verlauf der Vertretung stehen die Namen, aber keine fremden Standort- oder Ruhezeitgründe.
 - Der Verlauf bleibt bei HA-Neustarts erhalten und wird beim Entfernen der Integration gelöscht. Die HA-Glocke für dauerhafte Systemmeldungen bleibt davon unabhängig.
 
+### Meine Erreichbarkeit
+
+Unter **Notification Verlauf → Meine Erreichbarkeit** kannst du ab **1.8.0 Herald** dein eigenes Dispatcher-Profil ändern, auch ohne Adminrechte. Wähle **Rund um die Uhr (24/7)** oder stelle mit den Uhrzeitwählern getrennte Fenster für Werktage und Wochenende ein. Ein abgewählter Tagesblock bleibt ohne reguläre Zustellung. **Nur wenn zuhause** gilt auch bei 24/7. Info, Warnung und Erinnerung lassen sich einzeln auswählen; neue kritische Meldungen gehen weiterhin immer durch.
+
+**Speichern** wirkt sofort, auch für Fallback und bereits vorgemerkte persönliche Erinnerungen. 24/7 blendet die Zeitfelder aus und behält die zuletzt gespeicherten Fenster. Eine noch wirksame Ruhezeit aus einem älteren Profil wird angezeigt und kann ausdrücklich aufgehoben werden. Geräte, Gruppen und Personenzuordnung bleiben in der Integrationsverwaltung. Ohne eindeutige Verknüpfung deines HA-Kontos mit einer Dispatcher-Person lässt sich hier kein Profil bearbeiten.
+
 ### Direkt auf dem Handy antworten
 
 Ab **1.7.0 Herald** kannst du eine Dispatcher-Mitteilung auf dem iPhone gedrückt halten und **Gelesen**, **5 Min.**, **30 Min.** oder **60 Min.** wählen. Android bietet **Gelesen** und **Erinnern ...** an; die zweite Aktion zeigt die drei Zeiten als Schaltflächen in einer weiteren Mitteilung an. Es ist weder eine Bestätigung erforderlich noch eine zusätzliche Automation. Ohne Auswahl passiert nichts.
