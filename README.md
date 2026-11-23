@@ -50,6 +50,8 @@ Wähle Anfang und Ende minutengenau oder **Ganztägig**. Ein Fenster Montag 22:0
 
 **Speichern** wirkt sofort, auch für Fallback und bereits vorgemerkte persönliche Erinnerungen. 24/7 blendet die Zeitfelder aus und behält die zuletzt gespeicherten Fenster. Eine noch wirksame Ruhezeit aus einem älteren Profil wird angezeigt und kann ausdrücklich aufgehoben werden. Geräte, Gruppen und Personenzuordnung bleiben in der Integrationsverwaltung. Ohne eindeutige Verknüpfung deines HA-Kontos mit einer Dispatcher-Person lässt sich hier kein Profil bearbeiten.
 
+Vorschau mit Beispieldaten: [Wochenplan auf dem Desktop](docs/wochenplan.png) · [Tages- und Uhrzeitpicker auf dem Smartphone](docs/tagespicker.png).
+
 ### Direkt auf dem Handy antworten
 
 Ab **1.7.0 Herald** kannst du eine Dispatcher-Mitteilung auf dem iPhone gedrückt halten und **Gelesen**, **5 Min.**, **30 Min.** oder **60 Min.** wählen. Android bietet **Gelesen** und **Erinnern ...** an; die zweite Aktion zeigt die drei Zeiten als Schaltflächen in einer weiteren Mitteilung an. Es ist weder eine Bestätigung erforderlich noch eine zusätzliche Automation. Ohne Auswahl passiert nichts.
